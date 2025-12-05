@@ -1,413 +1,115 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Territorial — Socket Multiplayer (No bots)</title>
+<meta charset="utf-8">
+<title>Territorial Online</title>
+
 <style>
-/* مدمج CSS بسيط مريح - لا حاجة لملف خارجي */
-html,body{margin:0;padding:0;overflow:hidden;background:#0d1117;font-family:Tahoma,Arial,sans-serif;color:#e6eef8}
-canvas{display:block;touch-action:none}
-/* Lobby */
-#lobby{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0d1117,#111827,#1a2333);animation:bgMove 8s infinite alternate}
-@keyframes bgMove{0%{filter:brightness(1)}100%{filter:brightness(1.12)}}
-.card{background:rgba(6,10,18,0.75);backdrop-filter:blur(8px);padding:20px;border-radius:14px;width:360px;box-shadow:0 12px 40px rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.04)}
-.card h1{margin:0 0 12px;font-size:20px;text-align:center}
-#onlineControls{margin-top:12px}
-input,select,button{width:100%;padding:10px;margin:8px 0;border-radius:10px;border:none;background:#0f1724;color:#fff}
-button.green{background:#16a34a}
-.playerItem{display:flex;align-items:center;justify-content:space-between;padding:8px;background:rgba(255,255,255,0.03);border-radius:8px;margin:6px 0}
-.hostBadge{background:#ffd633;color:#000;padding:4px 8px;border-radius:6px;font-weight:700}
-#playersList{max-height:160px;overflow:auto;margin-top:8px}
-#dbgConsole{position:fixed;right:12px;top:12px;background:rgba(0,0,0,0.6);color:#fff;padding:10px;border-radius:8px;z-index:3000;max-width:36vw;display:none}
-#dbgConsole .close{position:absolute;left:8px;top:6px;cursor:pointer;color:#fff}
-#mainMenuBtn{position:fixed;right:12px;top:12px;z-index:2100;background:#2563eb;color:white;padding:8px 12px;border-radius:10px;cursor:pointer}
+body{margin:0;background:#000;color:white;font-family:tahoma}
+canvas{display:block}
+
+#consoleBox{
+  position:fixed;
+  top:10px;
+  left:10px;
+  width:320px;
+  height:200px;
+  background:black;
+  color:lime;
+  display:none;
+  padding:10px;
+  z-index:9999;
+  border:1px solid lime;
+}
+
+#consoleBox span{
+  cursor:pointer;
+  float:right;
+  color:red;
+  font-weight:bold
+}
 </style>
 </head>
+
 <body>
 
-<canvas id="game"></canvas>
-<canvas id="lineLayer" style="position:fixed;inset:0;pointer-events:none;z-index:1700"></canvas>
-
-<div id="ratioBar" style="position:fixed;left:50%;transform:translateX(-50%);bottom:12px;background:rgba(255,255,255,0.92);padding:10px 12px;border-radius:14px;display:flex;align-items:center;gap:12px;z-index:1800">
-  <span style="font-weight:700;color:#000">القوات:</span>
-  <input id="ratioSlider" type="range" min="10" max="100" value="50" style="width:160px">
-  <span id="ratioValue" style="color:#000">50%</span>
+<div id="consoleBox">
+  <span>X</span>
+  <pre id="consoleText"></pre>
 </div>
 
-<div id="lobby" role="dialog">
-  <div class="card">
-    <h1>لوبي اللعبة</h1>
-
-    <label>عدد اللاعبين (لعب محلي فقط)</label>
-    <select id="playerCount">
-      <option value="2">2</option>
-      <option value="3">3</option>
-      <option value="4" selected>4</option>
-    </select>
-
-    <label>معدل الإنتاج (مللي ثانية)</label>
-    <input id="prodRate" type="range" min="300" max="2000" value="900">
-
-    <div style="margin-top:10px">
-      <button id="startBtn" class="green">ابدأ محلي</button>
-    </div>
-
-    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.04);margin:12px 0">
-
-    <div id="onlineControls">
-      <input id="nicknameInput" placeholder="اسمك (مثال: Ali)">
-      <div style="display:flex;gap:8px;">
-        <button id="createRoomBtn" style="flex:1;background:#0b8f3b">انشاء غرفة</button>
-        <button id="joinRoomBtn" style="flex:1;background:#455a64">انضم لغرفة</button>
-      </div>
-      <input id="roomIdInput" placeholder="رمز الغرفة (للانضمام)">
-      <div id="playersList" aria-live="polite"></div>
-      <div style="display:flex;gap:8px;margin-top:8px;">
-        <button id="startGameBtn" style="flex:1;background:#1976d2" disabled>بدء اللعبة (فقط الهوست)</button>
-        <button id="leaveBtn" style="flex:1;background:#b71c1c;display:none">الخروج</button>
-      </div>
-    </div>
-
-  </div>
+<div id="lobby">
+  <input id="nicknameInput" placeholder="اسمك">
+  <button id="createRoomBtn">إنشاء غرفة</button>
+  <button id="joinRoomBtn">انضم</button>
+  <input id="roomIdInput" placeholder="رمز الغرفة">
+  <button id="startGameBtn">ابدأ</button>
+  <div id="playersList"></div>
 </div>
 
-<div id="dbgConsole"><span class="close" id="dbgClose">✕</span><div id="dbgText"></div></div>
-<button id="mainMenuBtn" style="display:none">⟵ رجوع</button>
+<canvas id="game" width="600" height="450"></canvas>
 
-<!-- Socket.io and client -->
 <script src="/socket.io/socket.io.js"></script>
-<script src="/socket-client.js"></script>
+<script src="socket-client.js"></script>
 
-<!-- FULL game code (as in your offline version) - unchanged gameplay logic -->
 <script>
-/* ---------- اللعبة نفسها (نسخةك الأوفلاين) ----------- */
-/* Important: this script expects window.multiplayer to exist (socket-client.js يعرّفه) */
-/* I kept the same game logic (buildGrid, startMultiplayer, moveTroops, ...). */
-/* For brevity I will include a faithful copy of your offline game code but removed firebase parts already. */
-/* Paste the major logic from your offline file here. For clarity and smallness I preserved same functions and event names. */
+const game = document.getElementById("game");
+const ctx = game.getContext("2d");
 
-var grid = [];
+let grid = [];
 
-document.addEventListener('DOMContentLoaded', ()=>{
-  'use strict';
-  // (I'll include a compacted working copy of your offline game code)
-  const HEX = 34;
-  const DEFEND_RADIUS = HEX * 3.2;
-  const gameCanvas = document.getElementById('game');
-  const lineCanvas = document.getElementById('lineLayer');
-  const dbg = document.getElementById('dbgText');
-  const dbgConsole = document.getElementById('dbgConsole');
-  const dbgClose = document.getElementById('dbgClose');
-  const ratioSlider = document.getElementById('ratioSlider');
-  const ratioValue = document.getElementById('ratioValue');
-  const startBtn = document.getElementById('startBtn');
-  const playerCount = document.getElementById('playerCount');
-  const prodRate = document.getElementById('prodRate');
-  const legendEl = document.getElementById('playersList'); // reuse for online listing
-  const mainMenuBtn = document.getElementById('mainMenuBtn');
-  const startGameBtn = document.getElementById('startGameBtn');
-  const createRoomBtn = document.getElementById('createRoomBtn');
-  const joinRoomBtn = document.getElementById('joinRoomBtn');
-  const leaveBtn = document.getElementById('leaveBtn');
-  const nicknameInput = document.getElementById('nicknameInput');
-  const roomIdInput = document.getElementById('roomIdInput');
-  const onlinePlayersList = document.getElementById('playersList');
+const consoleBox = document.getElementById("consoleBox");
+const consoleText = document.getElementById("consoleText");
 
-  dbgConsole.style.display = 'none';
-  dbgClose.addEventListener('click', ()=> dbgConsole.style.display='none');
+function log(m){
+  consoleText.textContent += m + "\n";
+}
 
-  function logConsole(msg){
-    dbgConsole.style.display = 'block';
-    const el = document.getElementById('dbgText');
-    const p = document.createElement('div'); p.textContent = msg;
-    el.appendChild(p);
-    // auto scroll
-    el.scrollTop = el.scrollHeight;
+document.addEventListener("keydown",e=>{
+  if(e.key.toLowerCase()==="c"){
+    consoleBox.style.display =
+      consoleBox.style.display==="none"?"block":"none";
   }
-
-  // canvas/context
-  let W=0,H=0;
-  function resize(){ W = gameCanvas.width = window.innerWidth; H = gameCanvas.height = window.innerHeight; lineCanvas.width = W; lineCanvas.height = H; needRender=true; }
-  window.addEventListener('resize', resize);
-  resize();
-  const ctx = gameCanvas.getContext('2d');
-  const lctx = lineCanvas.getContext('2d');
-
-  // game state
-  var players = [];
-  var cam = { x:0, y:0, scale:1 };
-  var selected = null;
-  var animations = [];
-  var effects = [];
-  var prodTimer = null;
-  var dragging=false, lastX=0, lastY=0;
-  var needRender = true;
-  var botTimer = null; // will not be used in online mode (no bots)
-
-  function buildGrid(){
-    grid.length = 0;
-    const cols = Math.max(8, Math.floor(W / (HEXR() * 1.6)));
-    const rows = Math.max(6, Math.floor(H / (HEXR() * 1.25)));
-    const startX = -cols * HEX * 0.85;
-    const startY = -rows * HEX * 0.95;
-    for(let r=0;r<rows;r++){
-      for(let c=0;c<cols;c++){
-        const x = startX + c * HEX * 1.7 + (r % 2 ? HEX * 0.85 : 0);
-        const y = startY + r * HEX * 1.45;
-        grid.push({ x, y, owner:null, troops:0, neighbors:[] });
-      }
-    }
-    for(let i=0;i<grid.length;i++){
-      const a = grid[i];
-      for(let j=0;j<grid.length;j++){
-        if(i===j) continue;
-        const b = grid[j];
-        if(Math.hypot(a.x - b.x, a.y - b.y) < HEX * 1.75) a.neighbors.push(j);
-      }
-    }
-    needRender = true;
-  }
-
-  function HEXR(){ return HEX; }
-  function worldToScreen(x,y){ return { x:(x + cam.x) * cam.scale + W/2, y:(y + cam.y) * cam.scale + H/2 }; }
-  function screenToWorld(sx,sy){ return { x:(sx - W/2) / cam.scale - cam.x, y:(sy - H/2) / cam.scale - cam.y }; }
-  function drawHex(cx,cy,r){ ctx.beginPath(); for(let i=0;i<6;i++){ const a=Math.PI/3*i + Math.PI/6; const x=cx+Math.cos(a)*r; const y=cy+Math.sin(a)*r; if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); } ctx.closePath(); }
-  function cellAt(wx,wy){ if(!grid || grid.length===0) return null; let best=null, bd=HEX*1.05; for(let i=0;i<grid.length;i++){ const d=Math.hypot(grid[i].x-wx, grid[i].y-wy); if(d<bd){ bd=d; best=i; } } return best; }
-  function isNeighbor(a,b){ if(!grid||!grid[a]||!grid[b]) return false; return Math.hypot(grid[a].x-grid[b].x, grid[a].y-grid[b].y) < HEX * 1.8; }
-
-  function setupPlayers(n){
-    players = [];
-    for(let i=0;i<n;i++){
-      const colors=['#3399ff','#ff5555','#ffe047','#8a60ff','#00c48c'];
-      players.push({ id:i, color:colors[i%colors.length], name:'P'+(i+1), capital:null, alive:true });
-    }
-    updateLegend();
-    needRender=true;
-  }
-
-  function seedCapitals(){
-    if(!grid || grid.length===0) buildGrid();
-    grid.forEach(c=>{ c.owner=null; c.troops=0; });
-    const xs = grid.map(c=>c.x), ys = grid.map(c=>c.y);
-    const cxMin = Math.min(...xs), cxMax = Math.max(...xs);
-    const cyMin = Math.min(...ys), cyMax = Math.max(...ys);
-    const corners = [[cxMin,cyMin],[cxMax,cyMin],[cxMin,cyMax],[cxMax,cyMax]];
-    const n = players.length;
-    for(let p=0;p<n;p++){
-      const pt = corners[p % corners.length];
-      let bestIdx=0, bestD=Infinity;
-      for(let i=0;i<grid.length;i++){
-        const d=Math.hypot(grid[i].x-pt[0], grid[i].y-pt[1]);
-        if(d<bestD){ bestD=d; bestIdx=i; }
-      }
-      grid[bestIdx].owner = players[p].id;
-      grid[bestIdx].troops = 40;
-      players[p].capital = bestIdx;
-    }
-    for(let i=0;i<grid.length;i++){ if(grid[i].owner==null && Math.random()<0.03){ grid[i].owner = Math.floor(Math.random()*players.length); grid[i].troops = 3 + Math.floor(Math.random()*4); } }
-    needRender=true;
-  }
-
-  function startProduction(ms){ if(prodTimer) clearInterval(prodTimer); prodTimer = setInterval(()=>{ if(grid && grid.length) grid.forEach(c=>{ if(c.owner != null) c.troops++; }); }, Math.max(50, parseInt(ms,10) || 900)); }
-
-  function animateMove(fromIdx,toIdx,color){ if(!grid||!grid[fromIdx]||!grid[toIdx]) return; animations.push({ fromIdx,toIdx,color,t:0 }); needRender = true; }
-  function updateAnimations(delta){ lctx.clearRect(0,0,W,H); if(!grid||grid.length===0) return; const remaining=[]; for(const a of animations){ a.t += delta*0.004; if(a.t>=1) continue; const A = worldToScreen(grid[a.fromIdx].x, grid[a.fromIdx].y); const B = worldToScreen(grid[a.toIdx].x, grid[a.toIdx].y); const x = A.x + (B.x - A.x) * a.t; const y = A.y + (B.y - A.y) * a.t; lctx.beginPath(); lctx.fillStyle = a.color; lctx.arc(x,y,6*Math.max(0.6,cam.scale),0,Math.PI*2); lctx.fill(); remaining.push(a); } animations = remaining; if(animations.length>0) needRender = true; }
-
-  function captureEffect(cellIdx){ const cell = grid[cellIdx]; if(!cell) return; const s = worldToScreen(cell.x, cell.y); effects.push({ type:'pulse', x:s.x, y:s.y, r:0, t:0, max: Math.max(W,H)*0.12 }); needRender=true; }
-
-  function updateEffects(dt){
-    lctx.clearRect(0,0,W,H);
-    const keep = [];
-    for(const e of effects){
-      e.t += dt;
-      if(e.type==='pulse'){
-        e.r = e.t * 0.4 * (1 + cam.scale);
-        const alpha = Math.max(0, 0.8 - e.t*0.008);
-        lctx.beginPath(); lctx.arc(e.x, e.y, e.r, 0, Math.PI*2);
-        lctx.strokeStyle = 'rgba(255,215,80,'+alpha+')';
-        lctx.lineWidth = Math.max(2, 6 * cam.scale);
-        lctx.stroke();
-        if(e.t < 80){ lctx.fillStyle = 'rgba(255,240,200,' + (0.12 + (80 - e.t)/800) + ')'; lctx.beginPath(); lctx.arc(e.x, e.y, Math.min(e.r, e.max*0.25), 0, Math.PI*2); lctx.fill(); }
-        if(e.t < 220) keep.push(e);
-      }
-    }
-    effects.length = 0; Array.prototype.push.apply(effects, keep);
-    if(keep.length>0) needRender = true;
-  }
-
-  function moveTroops(fromIdx,toIdx,ratio){
-    if(!grid||!grid[fromIdx]||!grid[toIdx]) return;
-    const f = grid[fromIdx], t = grid[toIdx];
-    const send = Math.floor(f.troops * ratio);
-    if(send <= 0) return;
-    f.troops = Math.max(0, f.troops - send);
-    animateMove(fromIdx,toIdx, players[f.owner] ? players[f.owner].color : '#fff');
-    if(t.owner === f.owner){ t.troops += send; }
-    else {
-      if(send > t.troops){
-        const defeatedOwner = t.owner;
-        t.owner = f.owner;
-        t.troops = send - t.troops;
-        // capital elimination
-        if(defeatedOwner != null && players[defeatedOwner] && players[defeatedOwner].capital === toIdx){
-          if(players[defeatedOwner]) players[defeatedOwner].alive = false;
-          for(const c of grid){ if(c.owner === defeatedOwner){ c.owner = null; c.troops = 0; } }
-          captureEffect(toIdx);
-          checkVictory();
-        }
-      } else {
-        t.troops = Math.max(0, t.troops - send);
-      }
-    }
-    needRender = true;
-  }
-
-  function botTick(){ /* left intentionally empty in online mode */ }
-
-  function drawCapitalMarker(cellIdx){
-    if(!grid[cellIdx]) return;
-    const c = grid[cellIdx];
-    const s = worldToScreen(c.x, c.y);
-    ctx.beginPath(); ctx.lineWidth = Math.max(2, 3 * cam.scale); ctx.strokeStyle = 'rgba(255,215,0,0.95)'; ctx.arc(s.x, s.y, HEX * cam.scale + 6 * cam.scale, 0, Math.PI*2); ctx.stroke();
-    ctx.fillStyle = 'rgba(255,215,0,0.95)'; ctx.font = (18 * Math.max(0.7, cam.scale)) + 'px Tahoma'; ctx.textAlign = 'center'; ctx.fillText('★', s.x, s.y - (HEX * cam.scale + 4 * cam.scale));
-  }
-
-  function render(){
-    if(!ctx) return;
-    if(!needRender && animations.length===0 && effects.length===0) return;
-    ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,W,H); ctx.fillStyle = '#0d1117'; ctx.fillRect(0,0,W,H);
-    if(!grid||grid.length===0) return;
-    for(let i=0;i<grid.length;i++){
-      const c = grid[i];
-      const s = worldToScreen(c.x, c.y);
-      drawHex(s.x, s.y, HEX * cam.scale);
-      ctx.fillStyle = c.owner == null ? '#ffffff' : players[c.owner] ? players[c.owner].color : '#fff';
-      ctx.fill();
-      if(i === selected){ ctx.strokeStyle = '#00ff00'; ctx.lineWidth = 3; ctx.stroke(); }
-      ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.font = (14 * Math.max(0.7, cam.scale)) + 'px Tahoma'; ctx.fillText(c.troops, s.x, s.y + (5 * cam.scale));
-    }
-    for(const p of players){ if(p && p.capital != null && p.alive){ drawCapitalMarker(p.capital); } }
-    needRender = false;
-  }
-
-  function updateLegend(){
-    // update online players list when multiplayer used; local legend left minimal
-  }
-
-  function updateEffectsAndAnimations(dt){ updateAnimations(dt); updateEffects(dt); }
-
-  function checkVictory(){ const alive = players.filter(p=>p && p.alive); if(alive.length===1){ const winner = alive[0]; if(prodTimer) clearInterval(prodTimer); if(botTimer) clearInterval(botTimer); alert('الفائز هو: ' + winner.name); } }
-
-  function returnToLobby(){
-    if(prodTimer) clearInterval(prodTimer);
-    if(botTimer) clearInterval(botTimer);
-    document.getElementById('lobby').style.display = 'flex';
-    buildGrid(); setupPlayers(parseInt(playerCount.value,10)||4); seedCapitals(); needRender=true;
-  }
-  if(mainMenuBtn) mainMenuBtn.addEventListener('click', returnToLobby);
-
-  // input handlers for canvas (pan/select/move)
-  ratioSlider.addEventListener('input', e=> ratioValue.textContent = e.target.value + '%');
-
-  gameCanvas.addEventListener('pointerdown', e=>{ dragging=true; lastX=e.clientX; lastY=e.clientY; gameCanvas.setPointerCapture && gameCanvas.setPointerCapture(e.pointerId); needRender=true; });
-  gameCanvas.addEventListener('pointerup', e=>{ dragging=false; gameCanvas.releasePointerCapture && gameCanvas.releasePointerCapture(e.pointerId); needRender=true; });
-  gameCanvas.addEventListener('pointermove', e=>{ if(!dragging) return; cam.x += (e.clientX - lastX) / cam.scale; cam.y += (e.clientY - lastY) / cam.scale; lastX = e.clientX; lastY = e.clientY; needRender=true; });
-  gameCanvas.addEventListener('click', e=>{
-    const pos = screenToWorld(e.clientX, e.clientY);
-    const idx = cellAt(pos.x, pos.y);
-    if(idx == null) return;
-    const cell = grid[idx];
-    if(selected === null){
-      if(typeof window.localOwnerId !== 'undefined'){
-        if(cell.owner === window.localOwnerId) selected = idx;
-      } else {
-        if(cell.owner === 0) selected = idx;
-      }
-    } else {
-      if(idx !== selected && isNeighbor(selected, idx)){
-        const ratio = ratioSlider ? parseInt(ratioSlider.value,10)/100 : 0.5;
-        try{
-          if(window.multiplayer && window.multiplayer.getCurrentRoom()){
-            window.multiplayer.sendAction({ type:'move', from:selected, to:idx, ratio:ratio });
-            moveTroops(selected, idx, ratio);
-          } else {
-            moveTroops(selected, idx, ratio);
-          }
-        }catch(err){ console.error(err); moveTroops(selected, idx, ratio); }
-      }
-      selected = null;
-    }
-    needRender=true;
-  });
-
-  // START local
-  function startGameLocal(){
-    try{
-      if(!grid || grid.length < 8) buildGrid();
-      const cnt = playerCount ? Math.max(2, Math.min(4, parseInt(playerCount.value,10) || 4)) : 4;
-      setupPlayers(cnt);
-      seedCapitals();
-      startProduction(prodRate ? parseInt(prodRate.value,10) : 900);
-      if(botTimer) clearInterval(botTimer);
-      botTimer = setInterval(botTick, 900); // bots only when playing local
-      document.getElementById('lobby').style.display = 'none';
-      needRender=true;
-    }catch(err){ console.error(err); logConsole(String(err)); }
-  }
-  startBtn.addEventListener('click', startGameLocal);
-  window.startGame = startGameLocal;
-
-  // multiplayer start handler (listens to socket-client.js event 'multiplayer_start')
-  window.addEventListener('multiplayer_start', (e)=>{
-    const pl = (e.detail && e.detail.players) ? e.detail.players : [];
-    const hostFlag = e.detail && e.detail.host;
-    startMultiplayer(pl, hostFlag);
-  });
-
-  function startMultiplayer(remotePlayers, hostFlag){
-    try{
-      if(!grid || grid.length < 8) buildGrid();
-      const cnt = Math.max(2, Math.min(4, remotePlayers.length || 2));
-      players = [];
-      for(let i=0;i<cnt;i++){
-        const rp = remotePlayers[i] || { id:'p_'+i, name:'Player'+(i+1), color: ['#3399ff','#ff5555','#ffe047','#8a60ff'][i%4] };
-        players.push({ id:i, color: rp.color, name: rp.name, capital:null, alive:true, remoteId: rp.id });
-      }
-      if(window.multiplayer && window.multiplayer.getMyId){
-        const myRemoteId = window.multiplayer.getMyId();
-        let assigned = 0;
-        for(let i=0;i<players.length;i++){
-          if(players[i].remoteId === myRemoteId){ assigned = i; break; }
-        }
-        window.localOwnerId = assigned;
-      }
-      seedCapitals();
-      if(prodTimer) clearInterval(prodTimer);
-      startProduction(prodRate ? parseInt(prodRate.value,10) : 900);
-      if(botTimer){ clearInterval(botTimer); botTimer = null; }
-      document.getElementById('lobby').style.display = 'none';
-      needRender = true;
-      logConsole('اللعبة بدأت - multiplayer');
-    }catch(err){ console.error('startMultiplayer error',err); logConsole('startMultiplayer error: '+err); }
-  }
-
-  // loop
-  let last = performance.now();
-  function frame(now){
-    const dt = now - last;
-    last = now;
-    try{ updateEffectsAndAnimations(dt); if(needRender || animations.length>0 || effects.length>0) render(); }catch(e){ console.error(e); logConsole(String(e)); }
-    requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
-
-  // initial preview
-  buildGrid(); setupPlayers(4); seedCapitals(); needRender = true;
-
 });
+consoleBox.querySelector("span").onclick=()=>{
+  consoleBox.style.display="none";
+};
+
+window.addEventListener("multiplayer_start", e=>{
+  const players = e.detail.players;
+  log("تم بدء اللعبة");
+
+  grid = [];
+  players.forEach((p,i)=>{
+    grid.push({
+      owner:i,
+      troops:20,
+      x: i%2===0? 0:550,
+      y: i<2?0:400
+    });
+  });
+
+  draw();
+});
+
+window.addEventListener("multiplayer_action",e=>{
+  const a = e.detail;
+  grid[a.to].owner = a.owner;
+  draw();
+});
+
+function draw(){
+  ctx.clearRect(0,0,600,450);
+  grid.forEach(c=>{
+    ctx.fillStyle = ["red","blue","yellow","green"][c.owner];
+    ctx.fillRect(c.x,c.y,50,50);
+  });
+}
+
+game.onclick=()=>{
+  multiplayer.send({ owner:0, to:1 });
+};
 </script>
 
-<!-- socket-client.js provides window.multiplayer -->
 </body>
 </html>
