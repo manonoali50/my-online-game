@@ -1,57 +1,62 @@
 (function(){
-  // Simple WebSocket client for rooms and syncing
-  const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
+  const proto = (location.protocol === 'https:' ? 'wss://' : 'ws://');
+  const host = location.host;
+  const url = proto + host + '/ws';
   let ws = null;
-  let mode = 'offline';
   let roomId = null;
-  let playerId = null;
+  let playerIndex = null;
   let isHost = false;
-  let handlers = {};
-  const reconnectDelay = 1500;
+  let reconnectTimer = null;
 
   function connect(){
     ws = new WebSocket(url);
-    ws.onopen = ()=>{ console.log('ws open'); };
-    ws.onmessage = e=>{ try{ const msg=JSON.parse(e.data); handle(msg); }catch(err){ console.error('invalid msg',err); } };
-    ws.onclose = ()=>{ console.log('ws closed'); setTimeout(()=>connect(), reconnectDelay); };
-    ws.onerror = (err)=>{ console.error('ws err', err); ws.close(); };
+    ws.onopen = ()=>{ window._debugLog && window._debugLog('WS connected: ' + url); };
+    ws.onmessage = e=>{ 
+      try{ const msg = JSON.parse(e.data); handle(msg); }catch(err){ window._debugLog('Invalid WS msg: '+ e.data); }
+    };
+    ws.onclose = ()=>{ window._debugLog('WS closed, reconnecting...'); reconnectTimer = setTimeout(connect,1500); };
+    ws.onerror = err=>{ window._debugLog('WS error: ' + err); ws.close(); };
   }
   connect();
 
-  function send(t, d){ if(!ws||ws.readyState!==1) return; ws.send(JSON.stringify({t, d})); }
+  function send(t,d){ if(!ws||ws.readyState!==1){ window._debugLog('WS not ready'); return; } ws.send(JSON.stringify({t,d})); }
 
   function handle(msg){
     const t = msg.t, d = msg.d;
+    window._debugLog && window._debugLog({t,d});
     if(t==='room_created'){
-      roomId = d.roomId; playerId = d.playerIndex; mode='online'; isHost = true;
-      alert('تم إنشاء الغرفة: ' + roomId + '\nانت المضيف. شارك الرمز للانضمام.');
+      roomId = d.roomId; playerIndex = d.playerIndex; isHost = true;
+      alert('تم إنشاء الغرفة: ' + roomId + '\nانت المضيف.');
+      window.updateRoomPlayers && window.updateRoomPlayers(d.players || []);
+      document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + roomId;
     } else if(t==='joined'){
-      roomId = d.roomId; playerId = d.playerIndex; mode='online'; isHost = d.isHost;
+      roomId = d.roomId; playerIndex = d.playerIndex; isHost = d.isHost;
       alert('انضممت للغرفة: ' + roomId + (isHost? ' (مضيف)':''));
+      window.updateRoomPlayers && window.updateRoomPlayers(d.players || []);
+      document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + roomId;
+    } else if(t==='player_joined' || t==='player_left' || t==='host_changed'){
+      // request state update
+      window._debugLog('room event: ' + t);
+      // server should send full state periodically; if d.players provided, update
+      if(d && d.players) window.updateRoomPlayers(d.players);
     } else if(t==='state'){
-      // full state update
-      window.applyState && window.applyState(d.state);
-    } else if(t==='player_left'){
-      alert('لاعب غادر الغرفة');
-    } else if(t==='host_changed'){
-      isHost = d.isHost;
-      alert('المضيف تغير. هل أنت المضيف الآن؟ ' + isHost);
+      if(d && d.state){
+        window.applyState && window.applyState(d.state);
+        document.getElementById('roomInfo') && (document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + (roomId||'—'));
+        if(d.players) window.updateRoomPlayers(d.players);
+      }
     } else if(t==='error'){
-      alert('خطأ: ' + d.message);
+      alert('خطأ: ' + (d && d.message));
     } else if(t==='game_started'){
-      alert('اللعبة بدأت');
-      // server will send state updates
+      window._debugLog('game started');
     }
   }
 
-  // public API
   window.socketClient = {
-    mode:'offline',
-    createRoom(opts){ send('create_room', {name: opts.name||null, maxPlayers: opts.maxPlayers||4}); },
-    joinRoom(opts){ send('join_room', {roomId: opts.roomId}); },
-    leaveRoom(){ if(roomId) send('leave_room', {roomId}); roomId=null; playerId=null; mode='offline'; },
-    sendAction(action){ if(!roomId) return; send('action', {roomId, action}); },
-    playerId:null
+    createRoom(opts){ send('create_room', opts || {}); },
+    joinRoom(opts){ send('join_room', opts || {}); },
+    leaveRoom(){ send('leave_room', {roomId}); roomId=null; playerIndex=null; isHost=false; },
+    sendAction(action){ send('action', { action, roomId }); },
+    startGame(opts){ send('start_game', { roomId, prodRate: (opts && opts.prodRate) || 900 }); }
   };
-
 })();
