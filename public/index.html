@@ -477,7 +477,10 @@ window.startOnlineGame=function(state){
         const c=grid[me.capital];
         cam.x=-c.x; cam.y=-c.y; cam.scale=1.2;
     }
-    needRender=true;
+    document.getElementById('lobby').style.display='none';
+document.getElementById('onlinePage').style.display='none';
+document.getElementById('game').style.display='block';
+needRender=true;
 };
 </script>
 
