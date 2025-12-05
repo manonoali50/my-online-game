@@ -1,7 +1,7 @@
 {
   "name": "territorial-online",
   "version": "1.0.0",
-  "description": "Territorial - Socket.IO multiplayer (no bots)",
+  "description": "Territorial Online Multiplayer Game",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -12,6 +12,5 @@
   },
   "engines": {
     "node": "18.x"
-  },
-  "license": "MIT"
+  }
 }
