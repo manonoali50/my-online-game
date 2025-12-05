@@ -466,5 +466,20 @@ window.updateRoomPlayers = function(players){
 window._debugLog = debugLog;
 </script>
 
+
+<script>
+window.startOnlineGame=function(state){
+    window.players=state.players;
+    window.grid=state.grid;
+    if (window.botTimer) clearInterval(window.botTimer);
+    const me=state.players.find(p=>p.isMe || p.socketId===window.socketId);
+    if (me && me.capital!=null){
+        const c=grid[me.capital];
+        cam.x=-c.x; cam.y=-c.y; cam.scale=1.2;
+    }
+    needRender=true;
+};
+</script>
+
 </body>
 </html>
