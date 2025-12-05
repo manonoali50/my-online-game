@@ -1,112 +1,101 @@
-// server.js - simple authoritative room server for the game
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const crypto = require('crypto');
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+const path = require("path");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
-
-// serve static files from ./public
-app.use(express.static('public'));
-
-// In-memory rooms store (simple)
-// rooms = { roomId: { hostId, players: { socketId: { id, name, color, joinedAt } }, started: bool } }
-const rooms = {};
-
-function makeRoomId(){ return crypto.randomBytes(3).toString('hex'); }
-
-io.on('connection', socket => {
-  console.log('conn', socket.id);
-
-  socket.on('create-room', (data, cb) => {
-    const nickname = (data && data.name) ? data.name : 'Host';
-    const roomId = makeRoomId();
-    rooms[roomId] = { hostId: socket.id, players: {}, started: false };
-    rooms[roomId].players[socket.id] = { id: socket.id, name: nickname, joinedAt: Date.now(), color: data && data.color ? data.color : null };
-    socket.join(roomId);
-    // reply with room info
-    cb && cb({ ok: true, roomId, players: Object.values(rooms[roomId].players), hostId: rooms[roomId].hostId });
-    io.to(roomId).emit('room-update', { players: Object.values(rooms[roomId].players), hostId: rooms[roomId].hostId, started: rooms[roomId].started });
-    console.log(`${socket.id} created ${roomId}`);
-  });
-
-  socket.on('join-room', (data, cb) => {
-    const roomId = data && data.roomId;
-    const name = (data && data.name) ? data.name : 'Guest';
-    if(!roomId || !rooms[roomId]) return cb && cb({ ok:false, error:'ROOM_NOT_FOUND' });
-    const r = rooms[roomId];
-    // limit players to 4 (same as game)
-    if(Object.keys(r.players).length >= 4) return cb && cb({ ok:false, error:'ROOM_FULL' });
-    r.players[socket.id] = { id: socket.id, name, joinedAt: Date.now(), color: data && data.color ? data.color : null };
-    socket.join(roomId);
-    cb && cb({ ok:true, roomId, players: Object.values(r.players), hostId: r.hostId, started: r.started });
-    io.to(roomId).emit('room-update', { players: Object.values(r.players), hostId: r.hostId, started: r.started });
-    console.log(`${socket.id} joined ${roomId}`);
-  });
-
-  socket.on('leave-room', (data, cb) => {
-    const roomId = data && data.roomId;
-    if(!roomId || !rooms[roomId]) return cb && cb({ ok:false, error:'ROOM_NOT_FOUND' });
-    const r = rooms[roomId];
-    if(r.players[socket.id]) delete r.players[socket.id];
-    socket.leave(roomId);
-    // reassign host if needed
-    if(r.hostId === socket.id){
-      const keys = Object.keys(r.players);
-      r.hostId = keys.length ? keys[0] : null;
-    }
-    // if empty destroy
-    if(Object.keys(r.players).length === 0){ delete rooms[roomId];
-      console.log(`room ${roomId} removed (empty)`);
-    } else {
-      io.to(roomId).emit('room-update', { players: Object.values(r.players), hostId: r.hostId, started: r.started });
-    }
-    cb && cb({ ok:true });
-  });
-
-  socket.on('start-game', (data, cb) => {
-    const roomId = data && data.roomId;
-    if(!roomId || !rooms[roomId]) return cb && cb({ ok:false, error:'ROOM_NOT_FOUND' });
-    const r = rooms[roomId];
-    if(socket.id !== r.hostId) return cb && cb({ ok:false, error:'ONLY_HOST' });
-    r.started = true;
-    // create players list payload
-    const players = Object.values(r.players).map(p => ({ id: p.id, name: p.name, color: p.color }));
-    io.to(roomId).emit('game-start', { players, hostId: r.hostId });
-    io.to(roomId).emit('room-update', { players, hostId: r.hostId, started: r.started });
-    cb && cb({ ok:true });
-  });
-
-  // generic game action (e.g., move)
-  socket.on('game-action', (data, cb) => {
-    const roomId = data && data.roomId;
-    const action = data && data.action;
-    if(!roomId || !rooms[roomId]) return cb && cb({ ok:false, error:'ROOM_NOT_FOUND' });
-    // broadcast to others in room (including sender, so clients stay in sync)
-    io.to(roomId).emit('game-action', { from: socket.id, action });
-    cb && cb({ ok:true });
-  });
-
-  socket.on('disconnect', () => {
-    // remove from any rooms
-    for(const roomId of Object.keys(rooms)){
-      const r = rooms[roomId];
-      if(r.players && r.players[socket.id]){
-        delete r.players[socket.id];
-        if(r.hostId === socket.id){
-          const keys = Object.keys(r.players);
-          r.hostId = keys.length ? keys[0] : null;
-        }
-        if(Object.keys(r.players).length === 0){ delete rooms[roomId]; console.log(`room ${roomId} deleted (empty)`); }
-        else io.to(roomId).emit('room-update', { players: Object.values(r.players), hostId: r.hostId, started: r.started });
-      }
-    }
-    console.log('disconnect', socket.id);
-  });
-
-});
+const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, ()=> console.log('Server listening on', PORT));
+
+// Serve index.html and other files directly from root
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+
+app.get("/:file", (req, res) => {
+  res.sendFile(path.join(__dirname, req.params.file));
+});
+
+// --------------------
+// Socket.io multiplayer
+// --------------------
+const rooms = {}; // roomId => { players: {}, actions: [], hostId }
+
+io.on("connection", (socket) => {
+  console.log("New socket connected:", socket.id);
+
+  socket.on("create_room", (data) => {
+    const { nickname } = data;
+    const roomId = Math.random().toString(36).substring(2, 8);
+    rooms[roomId] = {
+      players: {},
+      actions: [],
+      hostId: socket.id
+    };
+    rooms[roomId].players[socket.id] = { id: socket.id, name: nickname, color: randomColor() };
+    socket.join(roomId);
+    socket.emit("room_created", { roomId, players: rooms[roomId].players });
+    io.to(roomId).emit("update_players", rooms[roomId].players);
+  });
+
+  socket.on("join_room", (data) => {
+    const { nickname, roomId } = data;
+    if (!rooms[roomId]) {
+      socket.emit("error_msg", "Room not found");
+      return;
+    }
+    if (Object.keys(rooms[roomId].players).length >= 4) {
+      socket.emit("error_msg", "Room full");
+      return;
+    }
+    rooms[roomId].players[socket.id] = { id: socket.id, name: nickname, color: randomColor() };
+    socket.join(roomId);
+    io.to(roomId).emit("update_players", rooms[roomId].players);
+    socket.emit("joined_room", { roomId, players: rooms[roomId].players, host: rooms[roomId].hostId === socket.id });
+  });
+
+  socket.on("start_game", (data) => {
+    const { roomId } = data;
+    if (!rooms[roomId] || rooms[roomId].hostId !== socket.id) return;
+    io.to(roomId).emit("multiplayer_start", { players: Object.values(rooms[roomId].players), host: true });
+  });
+
+  socket.on("action", (data) => {
+    const { roomId, action } = data;
+    if (!rooms[roomId]) return;
+    rooms[roomId].actions.push({ from: socket.id, action });
+    socket.to(roomId).emit("multiplayer_action", action);
+  });
+
+  socket.on("disconnect", () => {
+    // Remove player from any rooms
+    for (const roomId in rooms) {
+      const room = rooms[roomId];
+      if (room.players[socket.id]) {
+        delete room.players[socket.id];
+        io.to(roomId).emit("update_players", room.players);
+        // If host left, assign new host
+        if (room.hostId === socket.id) {
+          const keys = Object.keys(room.players);
+          room.hostId = keys[0] || null;
+          io.to(roomId).emit("host_update", room.hostId);
+        }
+        // Delete room if empty
+        if (Object.keys(room.players).length === 0) {
+          delete rooms[roomId];
+        }
+      }
+    }
+  });
+});
+
+function randomColor() {
+  const colors = ['#e53935','#8e24aa','#3949ab','#00897b','#f4511e','#fb8c00','#43a047','#1e88e5'];
+  return colors[Math.floor(Math.random() * colors.length)];
+}
+
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
