@@ -1,100 +1,98 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-const path = require("path");
+// server.js
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET","POST"]
+  }
+});
 
 const PORT = process.env.PORT || 3000;
 
-// Serve index.html and other files directly from root
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
-});
+// تخزين الغرف واللاعبين
+const rooms = {}; 
+// rooms = {
+//   roomId1: { players: [{playerId,name,color,isHost,socketId},...], started: false },
+//   roomId2: {...}
+// }
 
-app.get("/:file", (req, res) => {
-  res.sendFile(path.join(__dirname, req.params.file));
-});
+app.use(express.static('public')); // ملفات HTML/CSS/JS
 
-// --------------------
-// Socket.io multiplayer
-// --------------------
-const rooms = {}; // roomId => { players: {}, actions: [], hostId }
+io.on('connection', (socket) => {
 
-io.on("connection", (socket) => {
-  console.log("New socket connected:", socket.id);
+  console.log('New client connected:', socket.id);
 
-  socket.on("create_room", (data) => {
-    const { nickname } = data;
-    const roomId = Math.random().toString(36).substring(2, 8);
+  socket.on('createRoom', ({ roomId, playerId, name, color }) => {
     rooms[roomId] = {
-      players: {},
-      actions: [],
-      hostId: socket.id
+      players: [{ playerId, name, color, isHost: true, socketId: socket.id }],
+      started: false
     };
-    rooms[roomId].players[socket.id] = { id: socket.id, name: nickname, color: randomColor() };
     socket.join(roomId);
-    socket.emit("room_created", { roomId, players: rooms[roomId].players });
-    io.to(roomId).emit("update_players", rooms[roomId].players);
+    io.to(roomId).emit('updatePlayers', rooms[roomId].players);
   });
 
-  socket.on("join_room", (data) => {
-    const { nickname, roomId } = data;
-    if (!rooms[roomId]) {
-      socket.emit("error_msg", "Room not found");
+  socket.on('joinRoom', ({ roomId, playerId, name, color }) => {
+    if(!rooms[roomId]) {
+      socket.emit('error', 'الغرفة غير موجودة');
       return;
     }
-    if (Object.keys(rooms[roomId].players).length >= 4) {
-      socket.emit("error_msg", "Room full");
-      return;
-    }
-    rooms[roomId].players[socket.id] = { id: socket.id, name: nickname, color: randomColor() };
+    const isHost = false;
+    rooms[roomId].players.push({ playerId, name, color, isHost, socketId: socket.id });
     socket.join(roomId);
-    io.to(roomId).emit("update_players", rooms[roomId].players);
-    socket.emit("joined_room", { roomId, players: rooms[roomId].players, host: rooms[roomId].hostId === socket.id });
+    io.to(roomId).emit('updatePlayers', rooms[roomId].players);
   });
 
-  socket.on("start_game", (data) => {
-    const { roomId } = data;
-    if (!rooms[roomId] || rooms[roomId].hostId !== socket.id) return;
-    io.to(roomId).emit("multiplayer_start", { players: Object.values(rooms[roomId].players), host: true });
+  socket.on('leaveRoom', ({ roomId, playerId }) => {
+    if(!rooms[roomId]) return;
+    rooms[roomId].players = rooms[roomId].players.filter(p=>p.playerId!==playerId);
+    // إذا لم يبق أحد، حذف الغرفة
+    if(rooms[roomId].players.length === 0){
+      delete rooms[roomId];
+    } else {
+      // تعيين هوست جديد إذا خرج الهوست
+      if(!rooms[roomId].players.some(p=>p.isHost)){
+        rooms[roomId].players[0].isHost = true;
+      }
+      io.to(roomId).emit('updatePlayers', rooms[roomId].players);
+    }
   });
 
-  socket.on("action", (data) => {
-    const { roomId, action } = data;
-    if (!rooms[roomId]) return;
-    rooms[roomId].actions.push({ from: socket.id, action });
-    socket.to(roomId).emit("multiplayer_action", action);
+  socket.on('startGame', ({ roomId }) => {
+    if(!rooms[roomId]) return;
+    rooms[roomId].started = true;
+    io.to(roomId).emit('gameStarted', rooms[roomId].players);
   });
 
-  socket.on("disconnect", () => {
-    // Remove player from any rooms
-    for (const roomId in rooms) {
+  socket.on('playerAction', ({ roomId, playerId, action }) => {
+    if(!rooms[roomId]) return;
+    socket.to(roomId).emit('playerAction', { playerId, action });
+  });
+
+  socket.on('disconnect', () => {
+    // إزالة اللاعب من أي غرفة كان فيها
+    for(const roomId in rooms){
       const room = rooms[roomId];
-      if (room.players[socket.id]) {
-        delete room.players[socket.id];
-        io.to(roomId).emit("update_players", room.players);
-        // If host left, assign new host
-        if (room.hostId === socket.id) {
-          const keys = Object.keys(room.players);
-          room.hostId = keys[0] || null;
-          io.to(roomId).emit("host_update", room.hostId);
-        }
-        // Delete room if empty
-        if (Object.keys(room.players).length === 0) {
+      const index = room.players.findIndex(p=>p.socketId === socket.id);
+      if(index !== -1){
+        room.players.splice(index,1);
+        if(room.players.length===0){
           delete rooms[roomId];
+        } else {
+          if(!room.players.some(p=>p.isHost)){
+            room.players[0].isHost = true;
+          }
+          io.to(roomId).emit('updatePlayers', room.players);
         }
       }
     }
   });
-});
 
-function randomColor() {
-  const colors = ['#e53935','#8e24aa','#3949ab','#00897b','#f4511e','#fb8c00','#43a047','#1e88e5'];
-  return colors[Math.floor(Math.random() * colors.length)];
-}
+});
 
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
