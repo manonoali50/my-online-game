@@ -41,6 +41,7 @@
     startGameBtn.style.display = 'block';
     createRoomBtn.disabled = true;
     joinRoomBtn.disabled = true;
+    startGameBtn.disabled = true; // الباقين لا يمكنهم بدء اللعبة
   }
 
   createRoomBtn.addEventListener('click', ()=>{
@@ -91,7 +92,7 @@
       div.innerHTML = `<div style="display:flex;gap:8px;align-items:center"><div style="width:12px;height:12px;background:${p.color};border-radius:50%"></div><div>${escapeHtml(p.name)}</div></div>` + (p.isHost ? '<div class="hostBadge">Host</div>' : '');
       playersList.appendChild(div);
     });
-    startGameBtn.disabled = !(isHost && players.length>=2);
+    if(isHost) startGameBtn.disabled = !(players.length >= 2);
   }
 
   function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
@@ -105,11 +106,12 @@
     joinRoomBtn.disabled = false;
   }
 
-  // استقبال التحديثات
+  // استقبال تحديث اللاعبين
   socket.on('updatePlayers', ({players, roomId})=>{
     if(roomId === currentRoom) renderPlayers(players);
   });
 
+  // استقبال بدء اللعبة من السيرفر لكل اللاعبين
   socket.on('gameStarted', ({roomId, players})=>{
     if(roomId === currentRoom){
       const ev = new CustomEvent('multiplayer_start', {detail:{players, host:isHost}});
