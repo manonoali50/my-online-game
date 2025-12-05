@@ -1,7 +1,6 @@
 {
   "name": "territorial-online",
   "version": "1.0.0",
-  "description": "Territorial game - simple websocket rooms for Railway deployment",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
