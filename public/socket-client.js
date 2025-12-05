@@ -3,6 +3,7 @@
   const host = location.host;
   const url = proto + host + '/ws';
   let ws = null;
+  let waitingForStart = false;
   let roomId = null;
   let playerIndex = null;
   let isHost = false;
@@ -41,13 +42,14 @@
       if(d && d.players) window.updateRoomPlayers(d.players);
     } else if(t==='state'){
       if(d && d.state){
+        if(waitingForStart){ waitingForStart = false; window._debugLog && window._debugLog('Starting online game from state'); if(window.startOnlineGame){ window.startOnlineGame(d.state); } }
         window.applyState && window.applyState(d.state);
         document.getElementById('roomInfo') && (document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + (roomId||'—'));
         if(d.players) window.updateRoomPlayers(d.players);
       }
     } else if(t==='error'){
       alert('خطأ: ' + (d && d.message));
-    } else if(t==='game_started'){
+    } else if(t==='game_started'){ waitingForStart = true; window._debugLog && window._debugLog('game_started received'); } else if(t==='state'){
       window._debugLog('game started');
     }
   }
