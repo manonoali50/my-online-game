@@ -4,82 +4,79 @@ const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: "*" }
-});
+const io = new Server(server);
 
-app.use(express.static('public')); // افترض ملفاتك في مجلد public
+const PORT = process.env.PORT || 3000;
 
-// هياكل الغرف
-const rooms = {};
+app.use(express.static(__dirname + '/public')); // ملفات اللعبة داخل مجلد public
 
-io.on('connection', (socket) => {
-  console.log('player connected:', socket.id);
+let rooms = {}; // { roomId: { players: [], started: false, hostId: socket.id } }
 
-  // إنشاء غرفة
-  socket.on('createRoom', ({ roomId, playerId, name, color }) => {
+function getRandomColor(usedColors) {
+  const colors = ['#e53935','#8e24aa','#3949ab','#00897b','#f4511e','#fb8c00','#43a047','#1e88e5'];
+  const available = colors.filter(c => !usedColors.includes(c));
+  return available[Math.floor(Math.random()*available.length)];
+}
+
+io.on('connection', socket => {
+  console.log('User connected:', socket.id);
+
+  socket.on('createRoom', (data, callback) => {
+    const roomId = Math.random().toString(36).substring(2,8);
+    const color = getRandomColor([]);
     rooms[roomId] = {
-      players: [{ id: playerId, name, color, isHost: true }],
-      gameStarted: false
+      hostId: socket.id,
+      started: false,
+      players: [{ id: socket.id, name: data.name, color }]
     };
     socket.join(roomId);
-    io.to(roomId).emit('updatePlayers', { roomId, players: rooms[roomId].players });
-    console.log(`غرفة تم إنشاؤها: ${roomId} بواسطة ${name}`);
+    callback({ roomId, players: rooms[roomId].players, host:true });
   });
 
-  // الانضمام لغرفة
-  socket.on('joinRoom', ({ roomId, playerId, name, color }) => {
+  socket.on('joinRoom', (data, callback) => {
+    const room = rooms[data.roomId];
+    if(!room) return callback({ error:'Room not found' });
+    if(room.players.length >= 4) return callback({ error:'Room full' });
+
+    const usedColors = room.players.map(p=>p.color);
+    const color = getRandomColor(usedColors);
+
+    const player = { id: socket.id, name: data.name, color };
+    room.players.push(player);
+    socket.join(data.roomId);
+
+    io.to(data.roomId).emit('updatePlayers', room.players);
+    callback({ roomId: data.roomId, players: room.players, host:false });
+  });
+
+  socket.on('startGame', (roomId) => {
     const room = rooms[roomId];
-    if (!room) return socket.emit('error', 'الغرفة غير موجودة');
-    if (room.gameStarted) return socket.emit('error', 'اللعبة بدأت بالفعل');
-    room.players.push({ id: playerId, name, color, isHost: false });
-    socket.join(roomId);
-    io.to(roomId).emit('updatePlayers', { roomId, players: room.players });
-    console.log(`${name} انضم للغرفة: ${roomId}`);
+    if(!room) return;
+    if(room.players.length < 2) return;
+
+    room.started = true;
+    io.to(roomId).emit('startGame', room.players);
   });
 
-  // مغادرة الغرفة
-  socket.on('leaveRoom', ({ roomId, playerId }) => {
-    const room = rooms[roomId];
-    if (!room) return;
-    room.players = room.players.filter(p => p.id !== playerId);
-    socket.leave(roomId);
-    if (room.players.length === 0) {
-      delete rooms[roomId];
-      console.log(`تم حذف الغرفة: ${roomId} (خالية)`);
-    } else {
-      // إذا خرج الهوست، اجعل أول لاعب آخر هو الهوست
-      if (!room.players.some(p => p.isHost)) room.players[0].isHost = true;
-      io.to(roomId).emit('updatePlayers', { roomId, players: room.players });
-    }
+  socket.on('sendAction', (data) => {
+    const roomId = data.roomId;
+    const action = data.action;
+    socket.to(roomId).emit('receiveAction', action);
   });
 
-  // بدء اللعبة (فقط الهوست)
-  socket.on('startGame', ({ roomId }) => {
-    const room = rooms[roomId];
-    if (!room) return;
-    if (room.gameStarted) return;
-    const host = room.players.find(p => p.isHost);
-    if (!host) return;
-
-    room.gameStarted = true;
-    io.to(roomId).emit('gameStarted', { roomId, players: room.players });
-    console.log(`اللعبة بدأت في الغرفة: ${roomId}`);
-  });
-
-  // استقبال حركة لاعب وإرسالها للجميع في الغرفة
-  socket.on('playerAction', ({ roomId, playerId, action }) => {
-    const room = rooms[roomId];
-    if (!room) return;
-    io.to(roomId).emit('playerAction', { playerId, action });
-  });
-
-  // قطع الاتصال
   socket.on('disconnect', () => {
-    console.log('player disconnected:', socket.id);
-    // اختياري: تنظيف الغرف إذا أردت (يمكن تطويره لاحقاً)
+    console.log('User disconnected:', socket.id);
+    for(const roomId in rooms){
+      const room = rooms[roomId];
+      const idx = room.players.findIndex(p=>p.id === socket.id);
+      if(idx !== -1){
+        room.players.splice(idx,1);
+        if(room.players.length === 0) delete rooms[roomId];
+        else if(room.hostId === socket.id) room.hostId = room.players[0].id;
+        io.to(roomId).emit('updatePlayers', room.players);
+      }
+    }
   });
 });
 
-const PORT = process.env.PORT || 8080;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, ()=>console.log(`Server running on port ${PORT}`));
