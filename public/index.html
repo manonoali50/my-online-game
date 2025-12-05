@@ -4,147 +4,41 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Territorial Online</title>
-<style>
-  body{margin:0;font-family:tahoma,sans-serif;background:#0d1117;color:white;}
-  #lobby,#game{display:none;padding:20px;}
-  .player{margin:5px 0;padding:5px;border-radius:5px;}
-  button{padding:5px 10px;margin:5px;}
-  input{padding:5px;margin:5px;}
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="mainMenu">
+  <h1>Territorial Online</h1>
+  <button id="btnOnline">اللعب أونلاين</button>
+  <button id="btnLocal">اللعب محلي</button>
+</div>
 
-<div id="login">
-  <h2>ادخل اسمك</h2>
+<div id="onlineMenu" class="hidden">
+  <button id="btnBackOnline" class="backBtn">رجوع</button>
+  <h2>اللعب أونلاين</h2>
   <input type="text" id="playerName" placeholder="اسمك">
   <button id="btnCreate">انشاء غرفة</button>
   <input type="text" id="roomIdInput" placeholder="رمز الغرفة للانضمام">
-  <button id="btnJoin">انضم للغرفة</button>
+  <button id="btnJoin">انضم لغرفة</button>
   <div id="loginMsg"></div>
 </div>
 
-<div id="lobby">
-  <h2>اللاعبون في الغرفة</h2>
+<div id="lobby" class="hidden">
+  <button id="btnBackLobby" class="backBtn">رجوع</button>
+  <h2>اللاعبون في الغرفة <span id="roomIdDisplay"></span></h2>
   <div id="playersList"></div>
-  <button id="btnStart" style="display:none;">ابدأ اللعبة</button>
+  <button id="btnStart" class="hidden">ابدأ اللعبة</button>
 </div>
 
-<div id="game">
-  <h2>اللعبة بدأت!</h2>
+<div id="game" class="hidden">
+  <button id="btnBackGame" class="backBtn">رجوع</button>
+  <h2>اللعبة</h2>
   <div id="gameInfo"></div>
-  <canvas id="gameCanvas" width="600" height="400" style="border:1px solid white;background:#111;"></canvas>
+  <canvas id="gameCanvas" width="600" height="400"></canvas>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="socket-client.js"></script>
-<script>
-const loginDiv = document.getElementById('login');
-const lobbyDiv = document.getElementById('lobby');
-const gameDiv = document.getElementById('game');
-const playerNameInput = document.getElementById('playerName');
-const roomIdInput = document.getElementById('roomIdInput');
-const loginMsg = document.getElementById('loginMsg');
-const playersListDiv = document.getElementById('playersList');
-const btnStart = document.getElementById('btnStart');
-const gameInfo = document.getElementById('gameInfo');
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-
-let roomId, playerColor, playerName, isHost=false;
-let players = [];
-
-// انشاء غرفة
-document.getElementById('btnCreate').onclick = ()=>{
-  playerName = playerNameInput.value.trim();
-  if(!playerName) { loginMsg.textContent='ادخل اسمك أولاً'; return; }
-  createRoom(playerName,(res)=>{
-    roomId = res.roomId;
-    players = res.players;
-    playerColor = players[0].color;
-    isHost = res.host;
-    enterLobby();
-  });
-};
-
-// الانضمام لغرفة
-document.getElementById('btnJoin').onclick = ()=>{
-  playerName = playerNameInput.value.trim();
-  const rId = roomIdInput.value.trim();
-  if(!playerName || !rId){ loginMsg.textContent='ادخل اسمك ورمز الغرفة'; return; }
-  joinRoom(playerName,rId,(res)=>{
-    if(res.error){ loginMsg.textContent = res.error; return; }
-    roomId = res.roomId;
-    players = res.players;
-    const me = players.find(p=>p.id === socket.id);
-    playerColor = me.color;
-    isHost = res.host;
-    enterLobby();
-  });
-};
-
-// دخول اللوبي
-function enterLobby(){
-  loginDiv.style.display='none';
-  lobbyDiv.style.display='block';
-  updatePlayersList(players);
-  if(isHost) btnStart.style.display='inline-block';
-}
-
-// بدء اللعبة (للمضيف فقط)
-btnStart.onclick = ()=>{
-  startGame(roomId);
-};
-
-// تحديث قائمة اللاعبين
-function updatePlayersList(players){
-  playersListDiv.innerHTML='';
-  players.forEach(p=>{
-    const div = document.createElement('div');
-    div.className='player';
-    div.textContent = p.name + (p.id===socket.id?' (انت)':'');
-    div.style.background=p.color;
-    playersListDiv.appendChild(div);
-  });
-}
-
-// استقبال تحديثات اللاعبين
-window.addEventListener('online_updatePlayers',(e)=>{
-  players = e.detail;
-  updatePlayersList(players);
-});
-
-// بدء اللعبة
-window.addEventListener('online_startGame',(e)=>{
-  players = e.detail;
-  lobbyDiv.style.display='none';
-  gameDiv.style.display='block';
-  gameInfo.textContent = 'اللاعبون: '+players.map(p=>p.name).join(', ');
-  initGame();
-});
-
-// استقبال الاكشن
-window.addEventListener('online_receiveAction',(e)=>{
-  handleAction(e.detail);
-});
-
-// ----- اللعبة (مثال بسيط) -----
-function initGame(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  players.forEach((p,i)=>{
-    ctx.fillStyle=p.color;
-    ctx.fillRect(50+i*60,50,50,50);
-  });
-  canvas.onclick = (ev)=>{
-    const x = ev.offsetX;
-    const y = ev.offsetY;
-    sendAction(roomId,{x,y,color:playerColor});
-  };
-}
-
-function handleAction(action){
-  ctx.fillStyle = action.color;
-  ctx.fillRect(action.x-10, action.y-10, 20, 20);
-}
-</script>
+<script src="main.js"></script>
 </body>
 </html>
