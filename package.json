@@ -1,18 +1,15 @@
 {
-  "name": "territorial-game",
+  "name": "territorial-online",
   "version": "1.0.0",
-  "description": "لعبة Multiplayer باستخدام Socket.IO و Node.js",
+  "description": "Territorial Game Online Version",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
+  "author": "YourName",
+  "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
     "socket.io": "^4.7.2"
-  },
-  "engines": {
-    "node": "18.x"
-  },
-  "author": "YourName",
-  "license": "MIT"
+  }
 }
