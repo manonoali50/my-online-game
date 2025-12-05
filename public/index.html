@@ -40,33 +40,7 @@ button{padding:12px;border-radius:10px;border:none;cursor:pointer;font-weight:70
   <span id="ratioValue">50%</span>
 </div>
 
-
 <div id="mainMenuBtn" role="button">⟵ رجوع</div>
-<button id="onlineBtn" style="margin-right:12px;position:fixed;right:12px;top:56px;z-index:2100;background:#06b6d4;padding:8px;border-radius:8px;color:#021025;font-weight:700;border:none;cursor:pointer">اونلاين (غرف)</button>
-
-<div id="onlinePanel" style="display:none;position:fixed;inset:0;z-index:2500;align-items:center;justify-content:center;background:rgba(5,8,12,0.6)">
-  <div class="card" id="roomUI" style="width:420px">
-    <h1>اونلاين — غرف اللعب</h1>
-    <div style="display:flex;gap:8px">
-      <input id="roomName" placeholder="اسم الغرفة (اختياري)" style="flex:1;padding:8px;border-radius:8px;border:none;background:#0b1220;color:#fff">
-      <select id="roomMax">
-        <option value="2">2 لاعبين</option>
-        <option value="3">3 لاعبين</option>
-        <option value="4" selected>4 لاعبين</option>
-      </select>
-    </div>
-    <div style="margin-top:8px">
-      <button id="createRoom" class="green" style="width:100%">إنشاء غرفة</button>
-    </div>
-    <hr style="margin:12px 0;border-color:#1f2937">
-    <div>
-      <input id="joinId" placeholder="ادخل رمز الغرفة للانضمام" style="width:100%;padding:8px;border-radius:8px;border:none;background:#0b1220;color:#fff">
-      <button id="joinRoom" style="margin-top:8px;width:100%" class="green">انضم للغرفة</button>
-    </div>
-    <div style="margin-top:10px;text-align:center;color:#9fb2c6;font-size:13px">زر الرجوع في الأعلى</div>
-  </div>
-</div>
-
 
 <div id="lobby" role="dialog" aria-label="Lobby">
   <div class="card">
@@ -85,8 +59,43 @@ button{padding:12px;border-radius:10px;border:none;cursor:pointer;font-weight:70
 
     <div style="margin-top:12px">
       <button id="startBtn" class="green" style="width:100%">ابدأ</button>
+    <button id="onlineBtnLocal" class="green" style="width:100%;background:#06b6d4;margin-top:8px">اونلاين (غرف)</button>
     </div>
   </div>
+</div>
+
+
+<!-- FULLSCREEN ONLINE PAGE -->
+<div id="onlinePage" style="display:none;position:fixed;inset:0;z-index:3000;background:linear-gradient(180deg,#0d1117,#071022);color:#e6eef8;overflow:auto;padding:36px 12px">
+  <div style="max-width:840px;margin:0 auto">
+    <div style="display:flex;justify-content:flex-end"><button id="onlineBack" style="background:#111827;color:white;padding:8px 12px;border-radius:10px;cursor:pointer">رجوع ⟵</button></div>
+    <h1 style="text-align:center;margin:18px 0;font-size:28px">اونلاين — نظام الغرف</h1>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+      <div style="background:rgba(6,10,18,0.7);padding:18px;border-radius:12px">
+        <h2 style="margin:0 0 8px">إنشاء غرفة</h2>
+        <input id="roomName" placeholder="اسم الغرفة (اختياري)" style="width:100%;padding:10px;border-radius:8px;border:none;background:#0b1220;color:#fff;margin-bottom:8px">
+        <label style="display:block;margin-bottom:6px">الحد الأقصى للاعبين</label>
+        <select id="roomMax" style="width:100%;padding:10px;border-radius:8px;border:none;background:#0b1220;color:#fff;margin-bottom:10px">
+          <option value="2">2 لاعبين</option><option value="3">3 لاعبين</option><option value="4" selected>4 لاعبين</option>
+        </select>
+        <div style="display:flex;gap:8px">
+          <button id="createRoom" class="green" style="flex:1">إنشاء</button>
+          <button id="startRoom" style="flex:1;background:#10b981;color:#fff;border-radius:8px;border:none;cursor:pointer">بدء (مضيف فقط)</button>
+        </div>
+        <div id="roomInfo" style="margin-top:10px;font-size:13px;color:#9fb2c6"></div>
+      </div>
+      <div style="background:rgba(6,10,18,0.7);padding:18px;border-radius:12px">
+        <h2 style="margin:0 0 8px">انضمام لغرفة</h2>
+        <input id="joinCode" placeholder="رمز الغرفة" style="width:100%;padding:10px;border-radius:8px;border:none;background:#0b1220;color:#fff;margin-bottom:8px">
+        <button id="joinRoom" class="green" style="width:100%">انضمام</button>
+        <div style="margin-top:12px">
+          <h3 style="margin:0 0 6px">اللاعبين في الغرفة</h3>
+          <ul id="playerList" style="list-style:none;padding:0;margin:0;color:#dbeafe"></ul>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:18px;color:#9fb2c6;font-size:13px">ملاحظة: الأونلاين يعمل بنظام WebSocket. عند بدء اللعبة تكون الخريطة متزامنة بين اللاعبين بدون بوتات.</div>
+  </div>
 </div>
 
 <div id="legend" aria-hidden="true"></div>
@@ -362,6 +371,99 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 });
 </script>
-<script src="socket-client.js"></script>
+
+<!-- DEBUG CONSOLE (toggle with M) -->
+<button id="debugToggle" title="Toggle Console (M)" style="position:fixed;left:12px;top:12px;z-index:4000;background:rgba(255,255,255,0.06);color:#fff;border:none;padding:8px 10px;border-radius:10px;cursor:pointer;font-weight:700">M</button>
+<div id="debugConsole" style="display:none;position:fixed;left:12px;top:56px;z-index:4000;width:360px;max-height:60vh;overflow:auto;background:rgba(2,6,23,0.9);border-radius:10px;padding:8px;color:#d1d5db;box-shadow:0 12px 40px rgba(0,0,0,0.6)">
+  <div style="display:flex;justify-content:flex-end"><button id="closeConsole" style="background:transparent;border:none;color:#f87171;font-weight:700;cursor:pointer">X</button></div>
+  <pre id="consoleLog" style="white-space:pre-wrap;font-size:12px;margin:0;height:60vh;overflow:auto"></pre>
+</div>
+
+
+<script>
+// Debug logger helper used by socket client and page
+window.debugLogs = [];
+function debugLog(msg){
+  try{
+    const pre = document.getElementById('consoleLog');
+    const time = new Date().toLocaleTimeString();
+    const line = '['+time+'] ' + (typeof msg === 'object' ? JSON.stringify(msg) : msg);
+    window.debugLogs.push(line);
+    if(pre){
+      pre.textContent = window.debugLogs.slice(-500).join("\n") + "\n";
+      pre.scrollTop = pre.scrollHeight;
+    }
+    console.log('DEBUG:', msg);
+  }catch(e){ console.log('debugLog failed', e); }
+}
+
+// Toggle debug console with M and button
+document.addEventListener('keydown', function(e){
+  if(e.key && e.key.toLowerCase() === 'm'){ toggleConsole(); }
+});
+document.getElementById('debugToggle').addEventListener('click', toggleConsole);
+document.getElementById('closeConsole').addEventListener('click', toggleConsole);
+function toggleConsole(){
+  const el = document.getElementById('debugConsole');
+  if(!el) return;
+  el.style.display = (el.style.display === 'none' ? 'block' : 'none');
+}
+
+// Online page wiring
+const onlineBtnLocal = document.getElementById('onlineBtnLocal');
+const onlinePage = document.getElementById('onlinePage');
+const onlineBack = document.getElementById('onlineBack');
+const createRoomBtn = document.getElementById('createRoom');
+const joinRoomBtn = document.getElementById('joinRoom');
+const startRoomBtn = document.getElementById('startRoom');
+const roomInfo = document.getElementById('roomInfo');
+const playerList = document.getElementById('playerList');
+const joinCodeInput = document.getElementById('joinCode');
+const roomNameInput = document.getElementById('roomName');
+const roomMaxSelect = document.getElementById('roomMax');
+
+onlineBtnLocal && onlineBtnLocal.addEventListener('click', ()=>{ onlinePage.style.display='block'; document.getElementById('lobby').style.display='none'; });
+onlineBack && onlineBack.addEventListener('click', ()=>{ onlinePage.style.display='none'; document.getElementById('lobby').style.display='flex'; });
+
+// socketClient assumed to be loaded via socket-client.js
+createRoomBtn && createRoomBtn.addEventListener('click', ()=>{
+  const name = roomNameInput.value || null;
+  const maxPlayers = parseInt(roomMaxSelect.value,10) || 4;
+  if(window.socketClient && window.socketClient.createRoom){
+    debugLog('Creating room...');
+    window.socketClient.createRoom({name, maxPlayers});
+  } else debugLog('socketClient not ready');
+});
+
+joinRoomBtn && joinRoomBtn.addEventListener('click', ()=>{
+  const code = joinCodeInput.value.trim();
+  if(!code) return alert('ادخل رمز الغرفة');
+  if(window.socketClient && window.socketClient.joinRoom){
+    debugLog('Joining room ' + code);
+    window.socketClient.joinRoom({roomId: code});
+  } else debugLog('socketClient not ready');
+});
+
+startRoomBtn && startRoomBtn.addEventListener('click', ()=>{
+  if(window.socketClient && window.socketClient.startGame){
+    window.socketClient.startGame({prodRate: parseInt(document.getElementById('prodRate').value,10) || 900});
+  } else debugLog('startGame not available');
+});
+
+// helper to update player list UI from server state
+window.updateRoomPlayers = function(players){ 
+  if(!playerList) return;
+  playerList.innerHTML = '';
+  players.forEach(p=>{
+    const li = document.createElement('li');
+    li.textContent = (p.name || ('P'+(p.index+1))) + (p.isHost? ' (Host)':''); 
+    playerList.appendChild(li);
+  });
+};
+
+// expose debugLog to socket-client as well
+window._debugLog = debugLog;
+</script>
+
 </body>
 </html>
