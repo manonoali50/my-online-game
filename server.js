@@ -4,11 +4,13 @@ const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+const io = new Server(server, {
+  cors: { origin: "*" }
+});
 
-app.use(express.static('public'));
+app.use(express.static('public')); // جميع الملفات في مجلد public
 
-// هيكل الغرف
+// هياكل الغرف
 const rooms = {};
 
 io.on('connection', (socket) => {
@@ -35,12 +37,9 @@ io.on('connection', (socket) => {
     else io.to(roomId).emit('updatePlayers', { roomId, players: rooms[roomId].players });
   });
 
-  socket.on('startGame', ({ roomId, playerId }) => {
-    const room = rooms[roomId];
-    if (!room) return;
-    const host = room.players.find(p => p.isHost);
-    if (!host || host.id !== playerId) return; // فقط الهوست يقدر يبدأ
-    io.to(roomId).emit('gameStarted', { roomId, players: room.players });
+  socket.on('startGame', ({ roomId }) => {
+    if (!rooms[roomId]) return;
+    io.to(roomId).emit('gameStarted', { roomId, players: rooms[roomId].players });
   });
 
   socket.on('playerAction', ({ roomId, playerId, action }) => {
@@ -50,17 +49,7 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('player disconnected:', socket.id);
-    // تنظيف تلقائي عند الخروج إذا أردت
-    for (const roomId in rooms) {
-      const room = rooms[roomId];
-      const idx = room.players.findIndex(p => p.id === socket.id);
-      if (idx !== -1) {
-        room.players.splice(idx, 1);
-        socket.leave(roomId);
-        if (room.players.length === 0) delete rooms[roomId];
-        else io.to(roomId).emit('updatePlayers', { roomId, players: room.players });
-      }
-    }
+    // تنظيف تلقائي إذا أردت لاحقًا
   });
 });
 
