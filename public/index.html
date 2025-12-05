@@ -3,27 +3,34 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Territorial — Online (With Effects)</title>
+<title>Territorial — Stable Final (With Effects)</title>
 <style>
 html,body{margin:0;padding:0;overflow:hidden;background:#0d1117;font-family:Tahoma,Arial,sans-serif}
 canvas{display:block;touch-action:none}
-#lobby{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0d1117,#111827,#1a2333);}
-.card{background:rgba(6,10,18,0.9);backdrop-filter:blur(8px);padding:16px;border-radius:12px;width:360px;box-shadow:0 12px 40px rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.04);color:#e6eef8}
-.card h1{margin:0 0 8px;font-size:18px;text-align:center}
-#mainMenuBtn{position:fixed;right:12px;top:12px;z-index:2100;background:#2563eb;color:white;padding:8px 12px;border-radius:10px;cursor:pointer}
-#onlineBtn{margin-top:8px;background:#06b6d4;padding:10px;border-radius:8px;color:#021025;font-weight:700;border:none;width:100%;cursor:pointer}
-#onlinePanel{display:none;position:fixed;inset:0;z-index:2500;align-items:center;justify-content:center;background:rgba(5,8,12,0.6)}
-#roomUI{width:420px}
-#backOnline{position:fixed;right:16px;top:12px;z-index:2600;background:#111827;color:white;padding:8px 10px;border-radius:10px;cursor:pointer}
+#lobby{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0d1117,#111827,#1a2333);animation:bgMove 8s infinite alternate}
+@keyframes bgMove{0%{filter:brightness(1)}100%{filter:brightness(1.12)}}
+.card{background:rgba(6,10,18,0.7);backdrop-filter:blur(8px);padding:24px;border-radius:14px;width:360px;box-shadow:0 12px 40px rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.04);color:#e6eef8}
+.card h1{margin:0 0 12px;font-size:20px;text-align:center}
+#telegramTag{font-size:20px;font-weight:700;color:#ff3333;text-align:center;margin-bottom:10px;text-shadow:0 0 8px rgba(255,0,0,0.12),0 0 18px rgba(255,0,0,0.06)}
+label{display:block;color:#aeb9c8;margin-top:10px}
+select,input[type=range]{width:100%;margin:8px 0;padding:10px;border-radius:10px;border:none;background:#101521;color:#fff}
+button{padding:12px;border-radius:10px;border:none;cursor:pointer;font-weight:700}
+.green{background:#16a34a;color:white}
 #ratioBar{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;background:rgba(255,255,255,0.92);padding:10px 12px;border-radius:14px;display:flex;align-items:center;gap:12px;z-index:1800}
 #ratioBar input{width:160px}
 #legend{position:fixed;left:12px;top:12px;z-index:1800;color:white;display:flex;flex-direction:column;gap:6px}
 .legend-item{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:8px}
+#dbg{position:fixed;right:8px;bottom:8px;z-index:2200;background:rgba(0,0,0,0.7);color:#fff;padding:8px;border-radius:8px;font-size:12px;display:none;max-width:40vw}
+#mainMenuBtn{position:fixed;right:12px;top:12px;z-index:2100;background:#2563eb;color:white;padding:8px 12px;border-radius:10px;box-shadow:0 8px 20px rgba(0,0,0,0.3);cursor:pointer}
 #victoryOverlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:3000}
 #victoryCard{background:linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03));backdrop-filter:blur(8px);padding:28px;border-radius:16px;text-align:center;color:white;box-shadow:0 30px 80px rgba(0,0,0,0.6)}
+#victoryCard h1{margin:8px 0 6px 0;font-size:32px}
+#victoryCard .crown{font-size:46px;filter:drop-shadow(0 8px 20px rgba(255,215,0,0.3))}
+#victoryCard button{margin-top:12px;padding:10px 16px;border-radius:10px;border:none;cursor:pointer}
 </style>
 </head>
 <body>
+
 <canvas id="game"></canvas>
 <canvas id="lineLayer" style="position:fixed;inset:0;pointer-events:none;z-index:1700"></canvas>
 
@@ -33,12 +40,12 @@ canvas{display:block;touch-action:none}
   <span id="ratioValue">50%</span>
 </div>
 
-<div id="mainMenuBtn" role="button">⟵ رجوع</div>
-<button id="onlineBtn">اونلاين (غرف)</button>
 
-<!-- Online panel -->
-<div id="onlinePanel">
-  <div class="card" id="roomUI">
+<div id="mainMenuBtn" role="button">⟵ رجوع</div>
+<button id="onlineBtn" style="margin-right:12px;position:fixed;right:12px;top:56px;z-index:2100;background:#06b6d4;padding:8px;border-radius:8px;color:#021025;font-weight:700;border:none;cursor:pointer">اونلاين (غرف)</button>
+
+<div id="onlinePanel" style="display:none;position:fixed;inset:0;z-index:2500;align-items:center;justify-content:center;background:rgba(5,8,12,0.6)">
+  <div class="card" id="roomUI" style="width:420px">
     <h1>اونلاين — غرف اللعب</h1>
     <div style="display:flex;gap:8px">
       <input id="roomName" placeholder="اسم الغرفة (اختياري)" style="flex:1;padding:8px;border-radius:8px;border:none;background:#0b1220;color:#fff">
@@ -60,107 +67,301 @@ canvas{display:block;touch-action:none}
   </div>
 </div>
 
+
+<div id="lobby" role="dialog" aria-label="Lobby">
+  <div class="card">
+    <h1>لوبي اللعبة</h1>
+    <div id="telegramTag">@Z_S_T_O</div>
+
+    <label>عدد اللاعبين</label>
+    <select id="playerCount">
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4" selected>4</option>
+    </select>
+
+    <label>معدل الإنتاج (مللي ثانية)</label>
+    <input id="prodRate" type="range" min="300" max="2000" value="900">
+
+    <div style="margin-top:12px">
+      <button id="startBtn" class="green" style="width:100%">ابدأ</button>
+    </div>
+  </div>
+</div>
+
 <div id="legend" aria-hidden="true"></div>
+<div id="dbg" role="status"></div>
+
 <div id="victoryOverlay"><div id="victoryCard"><div class="crown">👑</div><h1 id="victoryText"></h1><div id="victorName" style="font-size:20px;margin-top:6px"></div><button id="victoryToLobby" class="green">العودة للّوبي</button></div></div>
 
-<script src="socket-client.js"></script>
 <script>
-// --- Minimal client rendering & local UI wiring ---
-// We'll reuse much of the original rendering logic but rely on server state when online.
-let grid = [];
-let players = [];
-let cam = { x:0, y:0, scale:1 };
-let selected = null;
-let needRender = true;
-const HEX = 34;
-const DEFEND_RADIUS = HEX * 3.2;
+var grid = [];
 
-const gameCanvas = document.getElementById('game');
-const lineCanvas = document.getElementById('lineLayer');
-const ctx = gameCanvas.getContext('2d');
-const lctx = lineCanvas.getContext('2d');
-function resize(){ gameCanvas.width = lineCanvas.width = window.innerWidth; gameCanvas.height = lineCanvas.height = window.innerHeight; needRender=true; }
-window.addEventListener('resize', resize); resize();
+document.addEventListener('DOMContentLoaded', ()=>{
+  'use strict';
+  const HEX = 34;
+  const DEFEND_RADIUS = HEX * 3.2;
+  const gameCanvas = document.getElementById('game');
+  const lineCanvas = document.getElementById('lineLayer');
+  const dbg = document.getElementById('dbg');
+  const ratioSlider = document.getElementById('ratioSlider');
+  const ratioValue = document.getElementById('ratioValue');
+  const startBtn = document.getElementById('startBtn');
+  const playerCount = document.getElementById('playerCount');
+  const prodRate = document.getElementById('prodRate');
+  const legendEl = document.getElementById('legend');
+  const mainMenuBtn = document.getElementById('mainMenuBtn');
+  const victoryOverlay = document.getElementById('victoryOverlay');
+  const victoryText = document.getElementById('victoryText');
+  const victorName = document.getElementById('victorName');
+  const victoryToLobby = document.getElementById('victoryToLobby');
 
-function worldToScreen(x,y){ return { x:(x + cam.x) * cam.scale + gameCanvas.width/2, y:(y + cam.y) * cam.scale + gameCanvas.height/2 }; }
-function drawHex(cx,cy,r){ ctx.beginPath(); for(let i=0;i<6;i++){ const a=Math.PI/3*i + Math.PI/6; const x=cx+Math.cos(a)*r; const y=cy+Math.sin(a)*r; if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); } ctx.closePath(); }
+  if(!gameCanvas || !lineCanvas){ dbg.style.display='block'; dbg.textContent='خطأ: عناصر الرسم غير موجودة'; return; }
+  const ctx = gameCanvas.getContext('2d');
+  const lctx = lineCanvas.getContext('2d');
+  if(!ctx || !lctx){ dbg.style.display='block'; dbg.textContent='خطأ: تعذر إنشاء سياق 2D'; return; }
 
-function render(){
-  if(!needRender) return;
-  ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,gameCanvas.width,gameCanvas.height);
-  ctx.fillStyle = '#0d1117'; ctx.fillRect(0,0,gameCanvas.width,gameCanvas.height);
-  if(!grid||grid.length===0) return;
-  for(let i=0;i<grid.length;i++){
-    const c = grid[i]; const s = worldToScreen(c.x, c.y);
-    drawHex(s.x, s.y, HEX * cam.scale); ctx.fillStyle = c.owner == null ? '#ffffff' : players[c.owner] ? players[c.owner].color : '#fff'; ctx.fill();
-    ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.font = (14 * Math.max(0.7, cam.scale)) + 'px Tahoma'; ctx.fillText(c.troops, s.x, s.y + (5 * cam.scale));
-  }
-  for(const p of players){ if(p && p.capital != null && p.alive) drawCapital(p.capital); }
-  needRender=false;
-}
-function drawCapital(cellIdx){ if(!grid[cellIdx]) return; const c = grid[cellIdx]; const s = worldToScreen(c.x, c.y); ctx.beginPath(); ctx.lineWidth = Math.max(2, 3 * cam.scale); ctx.strokeStyle = 'rgba(255,215,0,0.95)'; ctx.arc(s.x, s.y, HEX * cam.scale + 6 * cam.scale, 0, Math.PI*2); ctx.stroke(); ctx.fillStyle = 'rgba(255,215,0,0.95)'; ctx.font = (18 * Math.max(0.7, cam.scale)) + 'px Tahoma'; ctx.textAlign = 'center'; ctx.fillText('★', s.x, s.y - (HEX * cam.scale + 4 * cam.scale)); }
+  let W = 0, H = 0;
+  let needRender = true;
+  function resize(){ W = gameCanvas.width = window.innerWidth || 300; H = gameCanvas.height = window.innerHeight || 200; lineCanvas.width = W; lineCanvas.height = H; needRender = true; }
+  window.addEventListener('resize', resize);
+  resize();
 
-requestAnimationFrame(function loop(){ render(); requestAnimationFrame(loop); });
+  var players = [];
+  var cam = { x:0, y:0, scale:1 };
+  var selected = null;
+  var animations = [];
+  var effects = [];
+  var prodTimer = null, botTimer = null;
+  var dragging = false, lastX = 0, lastY = 0;
 
-// UI wiring for online panel
-const onlineBtn = document.getElementById('onlineBtn');
-const onlinePanel = document.getElementById('onlinePanel');
-const createRoom = document.getElementById('createRoom');
-const joinRoomBtn = document.getElementById('joinRoom');
-const backOnline = document.getElementById('backOnline');
-const roomName = document.getElementById('roomName');
-const roomMax = document.getElementById('roomMax');
-const joinId = document.getElementById('joinId');
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  const audioCtx = AudioCtx ? new AudioCtx() : null;
+  function playTone(freq, duration=0.3, type='sine'){ if(!audioCtx) return; const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.type = type; o.frequency.value = freq; o.connect(g); g.connect(audioCtx.destination); const now = audioCtx.currentTime; g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.12, now + 0.01); o.start(now); g.gain.exponentialRampToValueAtTime(0.0001, now + duration); o.stop(now + duration + 0.02); }
+  function playVictorySound(){ playTone(880,0.5,'sine'); setTimeout(()=>playTone(660,0.35,'sine'),120); }
+  function playEliminatedSound(){ playTone(180,0.22,'sawtooth'); }
+  function playCaptureSound(){ playTone(520,0.18,'triangle'); }
+  function playCapitalCapture(){ playTone(760,0.45,'sine'); setTimeout(()=>playTone(520,0.3,'triangle'),160); }
 
-onlineBtn.addEventListener('click', ()=>{ onlinePanel.style.display='flex'; });
-// create room and join handled in socket-client.js via exposed API
-createRoom.addEventListener('click', ()=>{
-  window.socketClient && window.socketClient.createRoom({name:roomName.value||null, maxPlayers:parseInt(roomMax.value,10)||4});
+  function renderSafe(){ try{ updateAnimations(16); render(); }catch(e){ console.error(e); dbg.style.display='block'; dbg.textContent = String(e); } }
+
+  function HEXR(){ return HEX; }
+  function buildGrid(){
+    grid.length = 0;
+    const cols = Math.max(8, Math.floor(W / (HEXR() * 1.6)));
+    const rows = Math.max(6, Math.floor(H / (HEXR() * 1.25)));
+    const startX = -cols * HEX * 0.85;
+    const startY = -rows * HEX * 0.95;
+    for(let r=0;r<rows;r++){
+      for(let c=0;c<cols;c++){
+        const x = startX + c * HEX * 1.7 + (r % 2 ? HEX * 0.85 : 0);
+        const y = startY + r * HEX * 1.45;
+        grid.push({ x, y, owner:null, troops:0, neighbors:[] });
+      }
+    }
+    for(let i=0;i<grid.length;i++){
+      const a = grid[i];
+      for(let j=0;j<grid.length;j++){
+        if(i===j) continue;
+        const b = grid[j];
+        if(Math.hypot(a.x - b.x, a.y - b.y) < HEX * 1.75) a.neighbors.push(j);
+      }
+    }
+    needRender = true;
+  }
+
+  function worldToScreen(x,y){ return { x:(x + cam.x) * cam.scale + W/2, y:(y + cam.y) * cam.scale + H/2 }; }
+  function screenToWorld(sx,sy){ return { x:(sx - W/2) / cam.scale - cam.x, y:(sy - H/2) / cam.scale - cam.y }; }
+  function drawHex(cx,cy,r){ ctx.beginPath(); for(let i=0;i<6;i++){ const a=Math.PI/3*i + Math.PI/6; const x=cx+Math.cos(a)*r; const y=cy+Math.sin(a)*r; if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); } ctx.closePath(); }
+  function cellAt(wx,wy){ if(!grid || grid.length===0) return null; let best=null, bd=HEX*1.05; for(let i=0;i<grid.length;i++){ const d=Math.hypot(grid[i].x-wx, grid[i].y-wy); if(d<bd){ bd=d; best=i; } } return best; }
+  function isNeighbor(a,b){ if(!grid||!grid[a]||!grid[b]) return false; return Math.hypot(grid[a].x-grid[b].x, grid[a].y-grid[b].y) < HEX * 1.8; }
+
+  function setupPlayers(n){
+    players = [];
+    const usedColors = new Set();
+    const colorPool = ['#3399ff','#ff5555','#ffe047','#8a60ff','#00c48c','#ff8800','#33ffaa','#aa33ff','#ff33aa'];
+    for(let i=0;i<n;i++){
+      let color;
+      do { color = colorPool[Math.floor(Math.random() * colorPool.length)]; } while(usedColors.has(color));
+      usedColors.add(color);
+      players.push({ id:i, color:color, name:'P'+(i+1), capital:null, alive:true });
+    }
+    updateLegend();
+    needRender = true;
+  }
+
+  function seedCapitals(){
+    if(!grid || grid.length===0) buildGrid();
+    grid.forEach(c => { c.owner=null; c.troops=0; });
+
+    const xs = grid.map(c=>c.x), ys = grid.map(c=>c.y);
+    const cxMin = Math.min(...xs), cxMax = Math.max(...xs);
+    const cyMin = Math.min(...ys), cyMax = Math.max(...ys);
+    const corners = [[cxMin,cyMin],[cxMax,cyMin],[cxMin,cyMax],[cxMax,cyMax]];
+
+    for(let p=0; p<players.length; p++){
+      const pt = corners[p % corners.length];
+      let bestIdx=0, bestD=Infinity;
+      for(let i=0; i<grid.length; i++){
+        const d = Math.hypot(grid[i].x - pt[0], grid[i].y - pt[1]);
+        if(d < bestD){ bestD = d; bestIdx = i; }
+      }
+      grid[bestIdx].owner = players[p].id;
+      grid[bestIdx].troops = 40;
+      players[p].capital = bestIdx;
+    }
+    needRender = true;
+  }
+
+  function startProduction(ms){ if(prodTimer) clearInterval(prodTimer); prodTimer = setInterval(()=>{ if(grid && grid.length) grid.forEach(c=>{ if(c.owner != null) c.troops++; }); }, Math.max(50, parseInt(ms,10) || 900)); }
+
+  function animateMove(fromIdx,toIdx,color){ if(!grid||!grid[fromIdx]||!grid[toIdx]) return; animations.push({ fromIdx,toIdx,color,t:0 }); needRender = true; }
+  function updateAnimations(delta){ lctx.clearRect(0,0,W,H); if(!grid||grid.length===0) return; const remaining=[]; for(const a of animations){ a.t += delta*0.004; if(a.t>=1) continue; const A = worldToScreen(grid[a.fromIdx].x, grid[a.fromIdx].y); const B = worldToScreen(grid[a.toIdx].x, grid[a.toIdx].y); const x = A.x + (B.x - A.x) * a.t; const y = A.y + (B.y - A.y) * a.t; lctx.beginPath(); lctx.fillStyle = a.color; lctx.arc(x,y,6*Math.max(0.6,cam.scale),0,Math.PI*2); lctx.fill(); remaining.push(a); } animations = remaining; if(animations.length>0) needRender = true; }
+
+  function captureEffect(cellIdx){
+    const cell = grid[cellIdx]; if(!cell) return;
+    const s = worldToScreen(cell.x, cell.y);
+    effects.push({ type:'pulse', x:s.x, y:s.y, r:0, t:0, max: Math.max(W,H)*0.12 });
+    playCapitalCapture();
+    needRender = true;
+  }
+
+  function updateEffects(dt){
+    lctx.clearRect(0,0,W,H);
+    const keep = [];
+    for(const e of effects){
+      e.t += dt;
+      if(e.type==='pulse'){
+        e.r = e.t * 0.4 * (1 + cam.scale);
+        const alpha = Math.max(0, 0.8 - e.t*0.008);
+        lctx.beginPath(); lctx.arc(e.x, e.y, e.r, 0, Math.PI*2);
+        lctx.strokeStyle = 'rgba(255,215,80,'+alpha+')';
+        lctx.lineWidth = Math.max(2, 6 * cam.scale);
+        lctx.stroke();
+        if(e.t < 80){ lctx.fillStyle = 'rgba(255,240,200,' + (0.12 + (80 - e.t)/800) + ')'; lctx.beginPath(); lctx.arc(e.x, e.y, Math.min(e.r, e.max*0.25), 0, Math.PI*2); lctx.fill(); }
+        if(e.t < 220) keep.push(e);
+      }
+    }
+    effects.length = 0; Array.prototype.push.apply(effects, keep);
+    if(keep.length>0) needRender = true;
+  }
+
+  function moveTroops(fromIdx,toIdx,ratio){ if(!grid||!grid[fromIdx]||!grid[toIdx]) return; const f = grid[fromIdx], t = grid[toIdx]; const send = Math.floor(f.troops * ratio); if(send <= 0) return; f.troops = Math.max(0, f.troops - send); animateMove(fromIdx,toIdx, players[f.owner] ? players[f.owner].color : '#fff'); if(t.owner === f.owner){ t.troops += send; } else { if(send > t.troops){ const defeatedOwner = t.owner; t.owner = f.owner; t.troops = send - t.troops; playCaptureSound(); if(defeatedOwner != null && players[defeatedOwner] && players[defeatedOwner].capital === toIdx){ if(players[defeatedOwner]) players[defeatedOwner].alive = false; for(const c of grid){ if(c.owner === defeatedOwner){ c.owner = null; c.troops = 0; } } playEliminatedSound(); captureEffect(toIdx); if(f.owner === 0) playVictorySound(); checkVictory(); } } else { t.troops = Math.max(0, t.troops - send); } } needRender = true; }
+
+  function botTick(){ if(!grid||grid.length===0) return;
+    // NEW: Defensive reinforcement behavior
+    // For each bot, look for its cells that have adjacent enemy-owned neighbors (border cells).
+    // Then try to send reinforcements from other friendly cells (with >6 troops) to that border cell.
+    for(let p=1;p<players.length;p++){
+      const bot = players[p];
+      if(!bot || !bot.alive) continue;
+      // collect owned cells
+      const ownedIdx = grid.map((c,i)=>c.owner===p?i:null).filter(i=>i!==null);
+      if(ownedIdx.length===0) continue;
+      // find border cells (owned by bot and adjacent to any enemy/non-null owner)
+      const borderCells = [];
+      for(const i of ownedIdx){
+        const cell = grid[i];
+        if(!cell) continue;
+        for(const n of cell.neighbors){
+          if(grid[n] && grid[n].owner != null && grid[n].owner !== p){
+            borderCells.push(i);
+            break;
+          }
+        }
+      }
+      // For each border cell, attempt to pull reinforcements from closest friendly cell that isn't the border cell itself
+      for(const border of borderCells){
+        // if border already has decent troops, skip
+        if(grid[border].troops > 6) continue;
+        const candidates = ownedIdx.filter(i=>i!==border && grid[i].troops>6);
+        if(candidates.length===0) continue;
+        candidates.sort((a,b)=> Math.hypot(grid[a].x - grid[border].x, grid[a].y - grid[border].y) - Math.hypot(grid[b].x - grid[border].x, grid[b].y - grid[border].y));
+        // send 60% from the closest candidate
+        moveTroops(candidates[0], border, 0.6);
+      }
+    }
+
+    // Existing aggressive/expansion behavior (unchanged, but runs after defensive moves)
+    for(let p=1;p<players.length;p++){
+      const bot = players[p];
+      if(!bot || !bot.alive) continue;
+      const capIdx = bot.capital;
+      if(typeof capIdx === 'number' && capIdx != null){
+        const cap = grid[capIdx];
+        if(cap){
+          const defendRadius = HEX * 3.2;
+          let threat = null;
+          let threatDist = Infinity;
+          for(let i=0;i<grid.length;i++){
+            const cell = grid[i];
+            if(cell.owner != null && cell.owner !== p){
+              const d = Math.hypot(cell.x - cap.x, cell.y - cap.y);
+              if(d < defendRadius && d < threatDist){
+                threatDist = d;
+                threat = i;
+              }
+            }
+          }
+          if(threat != null){
+            const friendlyCells = grid.map((c,idx)=> c.owner===p && c.troops>6 ? idx : null).filter(i=>i!==null);
+            if(friendlyCells.length>0){
+              friendlyCells.sort((a,b)=> Math.hypot(grid[a].x-cap.x,grid[a].y-cap.y)-Math.hypot(grid[b].x-cap.x,grid[b].y-cap.y));
+              const origin = friendlyCells[0];
+              moveTroops(origin, threat, 0.75);
+              continue;
+            }
+          }
+        }
+      }
+      const ownedIdx = grid.map((c,i)=>c.owner===p?i:null).filter(i=>i!==null);
+      if(ownedIdx.length===0) continue;
+      const originIdx = ownedIdx[Math.floor(Math.random()*ownedIdx.length)];
+      const origin = grid[originIdx];
+      if(!origin||origin.troops<5) continue;
+      const neighIdx = origin.neighbors.slice();
+      if(neighIdx.length===0) continue;
+      let weakestIdx = neighIdx[0];
+      for(const ni of neighIdx) if(grid[ni].troops < grid[weakestIdx].troops) weakestIdx = ni;
+      moveTroops(originIdx, weakestIdx, 0.5);
+    }
+  }
+
+  function drawCapitalMarker(cellIdx){ if(!grid[cellIdx]) return; const c = grid[cellIdx]; const s = worldToScreen(c.x, c.y); ctx.beginPath(); ctx.lineWidth = Math.max(2, 3 * cam.scale); ctx.strokeStyle = 'rgba(255,215,0,0.95)'; ctx.arc(s.x, s.y, HEX * cam.scale + 6 * cam.scale, 0, Math.PI*2); ctx.stroke(); ctx.fillStyle = 'rgba(255,215,0,0.95)'; ctx.font = (18 * Math.max(0.7, cam.scale)) + 'px Tahoma'; ctx.textAlign = 'center'; ctx.fillText('★', s.x, s.y - (HEX * cam.scale + 4 * cam.scale)); }
+
+  function render(){ if(!ctx) return; if(!needRender && animations.length===0 && effects.length===0) return;
+    ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,W,H); ctx.fillStyle = '#0d1117'; ctx.fillRect(0,0,W,H); if(!grid||grid.length===0) return;
+    for(let i=0;i<grid.length;i++){ const c = grid[i]; const s = worldToScreen(c.x, c.y); drawHex(s.x, s.y, HEX * cam.scale); ctx.fillStyle = c.owner == null ? '#ffffff' : players[c.owner] ? players[c.owner].color : '#fff'; ctx.fill(); if(i === selected){ ctx.strokeStyle = '#00ff00'; ctx.lineWidth = 3; ctx.stroke(); } ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.font = (14 * Math.max(0.7, cam.scale)) + 'px Tahoma'; ctx.fillText(c.troops, s.x, s.y + (5 * cam.scale)); }
+    for(const p of players){ if(p && p.capital != null && p.alive){ drawCapitalMarker(p.capital); } }
+    const now = performance.now();
+    for(const p of players){ if(!p || p.capital==null || !p.alive) continue; const capIdx = p.capital; const cap = grid[capIdx]; if(!cap) continue; let danger=false; for(let i=0;i<grid.length;i++){ const cell = grid[i]; if(cell.owner != null && cell.owner !== p.id){ const d = Math.hypot(cell.x - cap.x, cell.y - cap.y); if(d < DEFEND_RADIUS){ danger=true; break; } } } if(danger){ const s = worldToScreen(cap.x, cap.y); const blink = 0.5 + 0.5 * Math.sin(now * 0.015); ctx.save(); ctx.translate(s.x, s.y - (HEX * cam.scale + 18 * cam.scale)); ctx.scale(cam.scale, cam.scale); ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(7, 8); ctx.lineTo(-7, 8); ctx.closePath(); ctx.fillStyle = 'rgba(255,80,80,'+blink+')'; ctx.fill(); ctx.restore(); } }
+    needRender = false;
+  }
+
+  function updateLegend(){ if(!legendEl) return; legendEl.innerHTML = ''; for(const p of players){ const div = document.createElement('div'); div.className = 'legend-item'; div.innerHTML = `<div style="width:14px;height:10px;background:${p.color};border-radius:4px"></div><div style="font-size:13px">${p.name}</div>`; legendEl.appendChild(div); } }
+
+  function updateEffectsAndAnimations(dt){ updateAnimations(dt); updateEffects(dt); }
+
+  function checkVictory(){ const alive = players.filter(p=>p && p.alive); if(alive.length===1){ const winner = alive[0]; if(prodTimer) clearInterval(prodTimer); if(botTimer) clearInterval(botTimer); victoryText.textContent = 'الفائز هو:'; victorName.textContent = winner.name; victoryOverlay.style.display = 'flex'; playVictorySound(); } }
+
+  function returnToLobby(){ if(prodTimer) clearInterval(prodTimer); if(botTimer) clearInterval(botTimer); victoryOverlay.style.display = 'none'; document.getElementById('lobby').style.display = 'flex'; buildGrid(); setupPlayers(parseInt(playerCount.value,10)||4); seedCapitals(); updateLegend(); render(); }
+  if(mainMenuBtn) mainMenuBtn.addEventListener('click', returnToLobby); if(victoryToLobby) victoryToLobby.addEventListener('click', returnToLobby);
+
+  if(ratioSlider && ratioValue) ratioSlider.addEventListener('input', e=> ratioValue.textContent = e.target.value + '%');
+  gameCanvas.addEventListener('pointerdown', e=>{ dragging = true; lastX = e.clientX; lastY = e.clientY; gameCanvas.setPointerCapture && gameCanvas.setPointerCapture(e.pointerId); needRender = true; });
+  gameCanvas.addEventListener('pointerup', e=>{ dragging = false; gameCanvas.releasePointerCapture && gameCanvas.releasePointerCapture(e.pointerId); needRender = true; });
+  gameCanvas.addEventListener('pointermove', e=>{ if(!dragging) return; cam.x += (e.clientX - lastX) / cam.scale; cam.y += (e.clientY - lastY) / cam.scale; lastX = e.clientX; lastY = e.clientY; needRender = true; });
+  gameCanvas.addEventListener('click', e=>{ const pos = screenToWorld(e.clientX, e.clientY); const idx = cellAt(pos.x, pos.y); if(idx == null) return; const cell = grid[idx]; if(selected === null){ if(cell.owner === 0) selected = idx; } else { if(idx !== selected && isNeighbor(selected, idx)){ const ratio = ratioSlider ? parseInt(ratioSlider.value,10)/100 : 0.5; moveTroops(selected, idx, ratio); } selected = null; } needRender = true; });
+
+  function startGame(){ try{ if(!grid || grid.length < 8) buildGrid(); const cnt = playerCount ? Math.max(2, Math.min(4, parseInt(playerCount.value,10) || 4)) : 4; setupPlayers(cnt); seedCapitals(); startProduction(prodRate ? parseInt(prodRate.value,10) : 900); if(botTimer) clearInterval(botTimer); botTimer = setInterval(botTick, 900); document.getElementById('lobby').style.display = 'none'; updateLegend(); needRender = true; }catch(err){ console.error(err); dbg.style.display='block'; dbg.textContent = String(err); } }
+  window.startGame = startGame; if(startBtn) startBtn.addEventListener('click', startGame);
+
+  let last = performance.now(); function frame(now){ const dt = now - last; last = now; try{ updateEffectsAndAnimations(dt); if(needRender || animations.length>0 || effects.length>0){ render(); } }catch(e){ console.error(e); dbg.style.display='block'; dbg.textContent = String(e); } requestAnimationFrame(frame); } requestAnimationFrame(frame);
+
+  buildGrid(); setupPlayers(4); seedCapitals(); updateLegend(); needRender = true;
+
 });
-joinRoomBtn.addEventListener('click', ()=>{
-  if(joinId.value.trim()=='') return alert('أدخل رمز الغرفة'); window.socketClient && window.socketClient.joinRoom({roomId:joinId.value.trim()});
-});
-// back button
-const backBtn = document.createElement('div'); backBtn.id='backOnline'; backBtn.textContent='⟵ رجوع'; backBtn.addEventListener('click', ()=>{ onlinePanel.style.display='none'; window.socketClient && window.socketClient.leaveRoom && window.socketClient.leaveRoom(); }); document.body.appendChild(backBtn);
-
-// receive updates from socket client
-function applyState(state){
-  if(!state) return;
-  grid = state.grid;
-  players = state.players;
-  needRender = true;
-  // if client has player index, center camera on its capital when game starts
-  if(window.socketClient && window.socketClient.playerId != null && players[window.socketClient.playerId] && players[window.socketClient.playerId].capital!=null){
-    const c = grid[players[window.socketClient.playerId].capital];
-    cam.x = -c.x; cam.y = -c.y; needRender=true;
-  }
-}
-
-window.applyState = applyState;
-
-// intercept clicks: when online, send move actions to server instead of local move
-gameCanvas.addEventListener('click', e=>{
-  const rect=gameCanvas.getBoundingClientRect();
-  const pos = { x:(e.clientX - rect.left - gameCanvas.width/2)/cam.scale - cam.x, y:(e.clientY - rect.top - gameCanvas.height/2)/cam.scale - cam.y };
-  // find nearest cell
-  let best=null, bd=HEX*1.05; for(let i=0;i<grid.length;i++){ const d=Math.hypot(grid[i].x-pos.x, grid[i].y-pos.y); if(d<bd){ bd=d; best=i; } }
-  if(best==null) return;
-  if(selected==null){
-    if(grid[best].owner=== (window.socketClient ? window.socketClient.playerId : 0)) selected=best;
-  } else {
-    if(best!==selected){
-      // send move command if online
-      if(window.socketClient && window.socketClient.mode==='online'){
-        const ratio = (document.getElementById('ratioSlider').value|0)/100;
-        window.socketClient.sendAction({type:'move', from:selected, to:best, ratio});
-      } else {
-        // offline action left as-is (not implemented here - online mode focuses)
-      }
-    }
-    selected=null;
-  }
-});
-
 </script>
+<script src="socket-client.js"></script>
 </body>
 </html>
