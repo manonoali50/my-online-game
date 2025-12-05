@@ -1,9 +1,7 @@
-// socket-client.js
 (() => {
-  // تأكد من أن الـ HTML يحتوي على عناصر متعلقة باللعبة
   if (!window || !document) return;
 
-  const socket = io(); // اتصل بالسيرفر مباشرة
+  const socket = io();
 
   let currentRoom = null;
   let myId = null;
@@ -25,19 +23,10 @@
     return colors[Math.floor(Math.random()*colors.length)];
   }
 
-  function openLobby(){
-    lobbyModal.style.display = 'flex';
-    lobbyModal.setAttribute('aria-hidden','false');
-  }
+  function openLobby(){ lobbyModal.style.display='flex'; }
+  function closeLobby(){ lobbyModal.style.display='none'; }
 
-  function closeLobby(){
-    lobbyModal.style.display = 'none';
-    lobbyModal.setAttribute('aria-hidden','true');
-  }
-
-  onlineBtn.addEventListener('click', ()=>{
-    openLobby();
-  });
+  onlineBtn.addEventListener('click', openLobby);
 
   function updateUIRoomCreated(){
     leaveBtn.style.display = 'block';
@@ -55,28 +44,30 @@
   }
 
   createRoomBtn.addEventListener('click', ()=>{
-    myName = (nicknameInput.value || 'Guest').trim();
-    if(!myName) { alert('اكتب اسم'); return; }
-    currentRoom = 'room_' + Math.floor(Math.random()*1000000);
-    myId = 'p_' + Date.now() + '_' + Math.floor(Math.random()*1000);
+    myName = (nicknameInput.value||'Guest').trim();
+    if(!myName) return alert('اكتب اسم');
+    myId = 'p_'+Date.now()+'_'+Math.floor(Math.random()*1000);
+    currentRoom = 'room_'+Math.floor(Math.random()*99999);
     isHost = true;
 
     socket.emit('createRoom', { roomId: currentRoom, playerId: myId, name: myName, color: randomColor() });
     roomIdInput.value = currentRoom;
     updateUIRoomCreated();
+    closeLobby();
   });
 
   joinRoomBtn.addEventListener('click', ()=>{
-    myName = (nicknameInput.value || 'Guest').trim();
-    if(!myName) { alert('اكتب اسم'); return; }
-    const id = (roomIdInput.value || '').trim();
-    if(!id){ alert('اكتب معرف الغرفة'); return; }
-    currentRoom = id;
-    myId = 'p_' + Date.now() + '_' + Math.floor(Math.random()*1000);
+    myName = (nicknameInput.value||'Guest').trim();
+    if(!myName) return alert('اكتب اسم');
+    const room = roomIdInput.value.trim();
+    if(!room) return alert('اكتب معرف الغرفة');
+    myId = 'p_'+Date.now()+'_'+Math.floor(Math.random()*1000);
+    currentRoom = room;
     isHost = false;
 
     socket.emit('joinRoom', { roomId: currentRoom, playerId: myId, name: myName, color: randomColor() });
     updateUIRoomJoined();
+    closeLobby();
   });
 
   leaveBtn.addEventListener('click', ()=>{
@@ -97,20 +88,16 @@
     players.forEach(p=>{
       const div = document.createElement('div');
       div.className = 'playerItem';
-      const isH = p.isHost;
-      div.innerHTML = `<div style="display:flex;gap:8px;align-items:center"><div style="width:12px;height:12px;background:${p.color};border-radius:50%"></div><div>${escapeHtml(p.name)}</div></div>` + (isH ? '<div class="hostBadge">Host</div>' : '');
+      div.innerHTML = `<div style="display:flex;gap:8px;align-items:center"><div style="width:12px;height:12px;background:${p.color};border-radius:50%"></div><div>${escapeHtml(p.name)}</div></div>` + (p.isHost ? '<div class="hostBadge">Host</div>' : '');
       playersList.appendChild(div);
     });
     startGameBtn.disabled = !(isHost && players.length>=2);
   }
 
-  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
   function cleanupLocal(){
-    currentRoom = null;
-    myId = null;
-    myName = null;
-    isHost = false;
+    currentRoom = null; myId = null; myName = null; isHost = false;
     playersList.innerHTML = '';
     leaveBtn.style.display = 'none';
     startGameBtn.style.display = 'none';
@@ -118,23 +105,21 @@
     joinRoomBtn.disabled = false;
   }
 
-  // استقبال التحديثات من السيرفر
-  socket.on('updatePlayers', (players)=>{
-    renderPlayers(players);
+  // استقبال التحديثات
+  socket.on('updatePlayers', ({players, roomId})=>{
+    if(roomId === currentRoom) renderPlayers(players);
   });
 
-  socket.on('gameStarted', (players)=>{
-    const ev = new CustomEvent('multiplayer_start', { detail: { players: players, host: isHost } });
-    window.dispatchEvent(ev);
-    closeLobby();
+  socket.on('gameStarted', ({roomId, players})=>{
+    if(roomId === currentRoom){
+      const ev = new CustomEvent('multiplayer_start', {detail:{players, host:isHost}});
+      window.dispatchEvent(ev);
+    }
   });
 
-  // إرسال تحركات اللعبة
   window.multiplayer = {
     sendAction: (action)=>{
-      if(currentRoom && myId){
-        socket.emit('playerAction', { roomId: currentRoom, playerId: myId, action });
-      }
+      if(currentRoom && myId) socket.emit('playerAction', { roomId: currentRoom, playerId: myId, action });
     },
     getCurrentRoom: ()=>currentRoom,
     isHost: ()=>isHost,
@@ -142,14 +127,10 @@
     getMyName: ()=>myName
   };
 
-  // استقبال تحركات الآخرين
-  socket.on('playerAction', (data)=>{
-    const a = data.action;
-    if(!a) return;
-    try{
-      const ev = new CustomEvent('multiplayer_action', { detail: a });
-      window.dispatchEvent(ev);
-    }catch(err){ console.error('apply action error',err); }
+  socket.on('playerAction', ({playerId, action})=>{
+    if(!action) return;
+    const ev = new CustomEvent('multiplayer_action', { detail: action });
+    window.dispatchEvent(ev);
   });
 
 })();
