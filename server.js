@@ -124,7 +124,9 @@ function handleMessage(ws, msg){
     const idx = room.players.length;
     const player = { ws, index: idx, name: 'P'+(idx+1), alive:true, capital:null };
     room.players.push(player);
+    // notify joining player
     ws.send(JSON.stringify({ t:'joined', d:{ roomId: room.id, playerIndex: player.index, isHost: room.host===player.index, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index)})) } }));
+    // notify others
     broadcast(room, { t:'player_joined', d:{ index: player.index, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index)})) } });
   } else if(t==='leave_room'){
     const room = rooms[d.roomId]; if(!room) return;
