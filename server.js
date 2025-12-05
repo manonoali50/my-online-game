@@ -1,126 +1,73 @@
-// server.js
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: "*" }
-});
-
-const PORT = process.env.PORT || 3000;
-
-// rooms structure:
-// rooms[roomId] = { hostSocketId, players: [ { id: socketId, name, color } ] }
-const rooms = {};
+const io = new Server(server);
 
 app.use(express.static('public'));
 
-function genColor(existingColors){
-  const palette = ['#e53935','#8e24aa','#3949ab','#00897b','#f4511e','#fb8c00','#43a047','#1e88e5','#3399ff','#ffe047'];
-  for(const c of palette) if(!existingColors.includes(c)) return c;
-  // fallback random
-  return '#' + Math.floor(Math.random()*16777215).toString(16);
-}
+const rooms = {};
 
 function genRoomId(){
-  return Math.random().toString(36).slice(2,8).toUpperCase();
+  return Math.random().toString(36).substring(2,8).toUpperCase();
 }
 
-io.on('connection', (socket) => {
-  console.log('client connected', socket.id);
+function genUniqueColor(used){
+  let c;
+  do{
+    c = '#' + Math.floor(Math.random()*16777215).toString(16);
+  } while(used.includes(c));
+  return c;
+}
 
-  socket.on('createRoom', (payload, cb) => {
-    const name = (payload && payload.name) ? payload.name : 'Guest';
+io.on('connection', socket => {
+
+  socket.on('createRoom', ({ name }, cb)=>{
     const roomId = genRoomId();
-    const color = genColor([]);
-    rooms[roomId] = { hostSocketId: socket.id, players: [ { id: socket.id, name, color } ] };
+    const color = genUniqueColor([]);
+    rooms[roomId] = {
+      host: socket.id,
+      players:[{ id: socket.id, name, color }]
+    };
     socket.join(roomId);
-    // respond to creator with room info
-    const data = { roomId, players: rooms[roomId].players, host: true };
-    if(typeof cb === 'function') cb(data);
-    io.to(roomId).emit('updatePlayers', { roomId, players: rooms[roomId].players });
-    console.log(`room ${roomId} created by ${socket.id}`);
+    cb({ roomId, players: rooms[roomId].players, host:true });
+    io.to(roomId).emit('updatePlayers', rooms[roomId].players);
   });
 
-  socket.on('joinRoom', (payload, cb) => {
-    const { name, roomId } = payload || {};
-    if(!roomId || !rooms[roomId]) {
-      if(typeof cb === 'function') cb({ error: 'الغرفة غير موجودة' });
-      return;
-    }
-    const existingColors = rooms[roomId].players.map(p=>p.color);
-    const color = genColor(existingColors);
-    const player = { id: socket.id, name: name || 'Guest', color };
-    rooms[roomId].players.push(player);
+  socket.on('joinRoom', ({ name, roomId }, cb)=>{
+    if(!rooms[roomId]) return cb({ error:'الغرفة غير موجودة' });
+
+    const used = rooms[roomId].players.map(p=>p.color);
+    const color = genUniqueColor(used);
+
+    rooms[roomId].players.push({ id: socket.id, name, color });
     socket.join(roomId);
-    const isHost = rooms[roomId].hostSocketId === socket.id;
-    if(typeof cb === 'function') cb({ roomId, players: rooms[roomId].players, host: isHost });
-    io.to(roomId).emit('updatePlayers', { roomId, players: rooms[roomId].players });
-    console.log(`${socket.id} joined room ${roomId}`);
+
+    cb({ roomId, players: rooms[roomId].players, host:false });
+    io.to(roomId).emit('updatePlayers', rooms[roomId].players);
   });
 
-  socket.on('leaveRoom', (payload) => {
-    const { roomId } = payload || {};
-    if(!roomId || !rooms[roomId]) return;
-    const room = rooms[roomId];
-    room.players = room.players.filter(p => p.id !== socket.id);
-    socket.leave(roomId);
-    if(room.players.length === 0){
-      delete rooms[roomId];
-      console.log(`room ${roomId} deleted (empty)`);
-    } else {
-      if(room.hostSocketId === socket.id){
-        room.hostSocketId = room.players[0].id;
-      }
-      io.to(roomId).emit('updatePlayers', { roomId, players: room.players });
+  socket.on('startGame', ({ roomId })=>{
+    if(!rooms[roomId]) return;
+    if(rooms[roomId].host !== socket.id) return;
+
+    io.to(roomId).emit('gameStarted', rooms[roomId].players);
+  });
+
+  socket.on('action', ({ roomId, data })=>{
+    socket.to(roomId).emit('action', data);
+  });
+
+  socket.on('disconnect', ()=>{
+    for(const r in rooms){
+      rooms[r].players = rooms[r].players.filter(p=>p.id!==socket.id);
+      if(rooms[r].players.length===0) delete rooms[r];
+      else io.to(r).emit('updatePlayers', rooms[r].players);
     }
-  });
-
-  socket.on('startGame', (payload) => {
-    const { roomId } = payload || {};
-    if(!roomId || !rooms[roomId]) return;
-    // only host can trigger start (server-side safety)
-    if(rooms[roomId].hostSocketId !== socket.id){
-      // ignore
-      return;
-    }
-    const players = rooms[roomId].players.map(p => ({ id: p.id, name: p.name, color: p.color }));
-    io.to(roomId).emit('gameStarted', { roomId, players });
-    console.log(`gameStarted in ${roomId} by host ${socket.id}`);
-  });
-
-  socket.on('playerAction', (payload) => {
-    const { roomId, action } = payload || {};
-    if(!roomId || !rooms[roomId]) return;
-    // broadcast to others in room
-    socket.to(roomId).emit('playerAction', { playerId: socket.id, action });
-  });
-
-  socket.on('disconnect', () => {
-    // remove from any room
-    for(const roomId of Object.keys(rooms)){
-      const room = rooms[roomId];
-      const idx = room.players.findIndex(p => p.id === socket.id);
-      if(idx !== -1){
-        room.players.splice(idx, 1);
-        socket.leave(roomId);
-        if(room.players.length === 0){
-          delete rooms[roomId];
-          console.log(`room ${roomId} removed (empty after disconnect)`);
-        } else {
-          if(room.hostSocketId === socket.id){
-            room.hostSocketId = room.players[0].id;
-          }
-          io.to(roomId).emit('updatePlayers', { roomId, players: room.players });
-        }
-        break;
-      }
-    }
-    console.log('client disconnected', socket.id);
   });
 
 });
 
-server.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+server.listen(process.env.PORT || 3000);
