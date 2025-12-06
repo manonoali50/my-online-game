@@ -623,7 +623,7 @@ if(typeof window.needRender !== 'undefined') window.needRender = true;
 };
 
 window._centeredOnStart=false;
-window.startOnlineGame = function(state){
+window.startOnlineGame = function(state){ try{
   try{
     if(!state) return;
     window.isOnline = true;
