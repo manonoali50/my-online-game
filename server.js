@@ -9,8 +9,8 @@ app.use(express.static('public'));
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server, path: '/ws' });
 
-// Re-used HEX/layout constants to match client buildGrid (client uses HEX=34)
 const HEX = 34;
+const COLOR_POOL = ['#3399ff','#ff5555','#ffe047','#8a60ff','#00c48c','#ff8800','#33ffaa','#aa33ff','#ff33aa'];
 
 function buildGridForServer(cols = 10, rows = 8){
   const grid = [];
@@ -93,7 +93,7 @@ wss.on('connection', function connection(ws){
       const idx = room.players.findIndex(p=>p.ws === ws);
       if(idx!==-1){
         const left = room.players.splice(idx,1)[0];
-        broadcast(room, { t:'player_left', d:{index:left.index, players:room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index)}))} });
+        broadcast(room, { t:'player_left', d:{ index:left.index, players:room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),socketId:p.socketId,color:p.color})) } });
         if(room.host === left.index){
           if(room.players.length>0){ room.host = room.players[0].index; broadcast(room,{t:'host_changed', d:{host:room.host}}); }
         }
@@ -105,6 +105,8 @@ wss.on('connection', function connection(ws){
       }
     }
   });
+  // send a hello with assigned socketId
+  try{ ws.send(JSON.stringify({ t:'hello', d:{ socketId: ws.id } })); }catch(e){}
 });
 
 function handleMessage(ws, msg){
@@ -116,32 +118,27 @@ function handleMessage(ws, msg){
     const defaultRows = Math.max(6, d.rows || 8);
     const room = { id: roomId, players: [], host: null, maxPlayers, grid: buildGridForServer(defaultCols, defaultRows), prodTimer:null, running:false };
     rooms[roomId] = room;
-    const player = { ws, index: 0, name: d.name || ('P1'), alive:true, capital:null };
+    const player = { ws, index: 0, name: d.name || ('P1'), alive:true, capital:null, socketId: ws.id, color: COLOR_POOL[0 % COLOR_POOL.length] };
     room.players.push(player); room.host = player.index;
-    ws.send(JSON.stringify({ t:'room_created', d:{ roomId, playerIndex:player.index, isHost:true, players: room.players.map(p=>({index:p.index,name:p.name,isHost:true})) } }));
+    ws.send(JSON.stringify({ t:'room_created', d:{ roomId, playerIndex:player.index, isHost:true, socketId: ws.id, players: room.players.map(p=>({index:p.index,name:p.name,isHost:true,socketId:p.socketId,color:p.color})) } }));
   } else if(t==='join_room'){
     const room = rooms[d.roomId];
     if(!room){ ws.send(JSON.stringify({t:'error', d:{message:'الغرفة غير موجودة'}})); return; }
     if(room.players.length >= room.maxPlayers){ ws.send(JSON.stringify({t:'error', d:{message:'الغرفة ممتلئة'}})); return; }
     const idx = room.players.length;
-    const player = { ws, index: idx, name: 'P'+(idx+1), alive:true, capital:null };
+    const player = { ws, index: idx, name: 'P'+(idx+1), alive:true, capital:null, socketId: ws.id, color: COLOR_POOL[idx % COLOR_POOL.length] };
     room.players.push(player);
-    ws.send(JSON.stringify({ t:'joined', d:{ roomId: room.id, playerIndex: player.index, isHost: room.host===player.index, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index)})) } }));
-    broadcast(room, { t:'player_joined', d:{ index: player.index, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index)})) } });
+    ws.send(JSON.stringify({ t:'joined', d:{ roomId: room.id, playerIndex: player.index, isHost: room.host===player.index, socketId: ws.id, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),socketId:p.socketId,color:p.color})) } }));
+    broadcast(room, { t:'player_joined', d:{ index: player.index, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),socketId:p.socketId,color:p.color})) } });
   } else if(t==='leave_room'){
     const room = rooms[d.roomId]; if(!room) return;
     const i = room.players.findIndex(p=>p.ws===ws);
-    if(i!==-1){ const left = room.players.splice(i,1)[0]; broadcast(room,{t:'player_left', d:{index:left.index, players:room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index)}))}}); if(room.host===left.index){ if(room.players.length>0){ room.host = room.players[0].index; broadcast(room,{t:'host_changed', d:{host:room.host}}); } } if(room.players.length===0){ if(room.prodTimer) clearInterval(room.prodTimer); delete rooms[room.id]; } }
+    if(i!==-1){ const left = room.players.splice(i,1)[0]; broadcast(room,{t:'player_left', d:{index:left.index, players:room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),socketId:p.socketId,color:p.color}))}}); if(room.host===left.index){ if(room.players.length>0){ room.host = room.players[0].index; broadcast(room,{t:'host_changed', d:{host:room.host}}); } } if(room.players.length===0){ if(room.prodTimer) clearInterval(room.prodTimer); delete rooms[room.id]; } }
   } else if(t==='host_grid'){
     const room = rooms[d.roomId];
     if(!room) { ws.send(JSON.stringify({t:'error', d:{message:'الغرفة غير موجودة'}})); return; }
     if(d.grid && Array.isArray(d.grid) && d.grid.length>0){
-      // Accept host-provided grid so online matches offline exactly
       room.grid = d.grid;
-      // Recompute neighbors (in case)
-      for(let i=0;i<room.grid.length;i++){
-        room.grid[i].neighbors = room.grid[i].neighbors || [];
-      }
     }
     if(d.players && Array.isArray(d.players)){
       for(const pd of d.players){
@@ -159,7 +156,7 @@ function handleMessage(ws, msg){
     if(!room.grid || room.grid.length===0){
       room.grid = buildGridForServer(Math.max(8,10), Math.max(6,8));
     }
-    const playersArr = room.players.map(p=>({ws:p.ws, index:p.index, capital:p.capital||null, alive:p.alive}));
+    const playersArr = room.players.map(p=>({ws:p.ws, index:p.index, capital:p.capital||null, alive:p.alive, socketId:p.socketId, color:p.color}));
     const anyCapital = playersArr.some(p=>typeof p.capital === 'number' && p.capital !== null);
     if(!anyCapital){
       seedCapitalsForPlayers(room.grid, playersArr);
@@ -176,18 +173,17 @@ function handleMessage(ws, msg){
     room.running = true;
     room.prodTimer = setInterval(()=>{
       for(const c of room.grid){ if(c.owner != null) c.troops++; }
-      broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),capital:p.capital,alive:p.alive})) } } });
+      broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),capital:p.capital,alive:p.alive,socketId:p.socketId,color:p.color})) } } });
     }, Math.max(50, (d.prodRate||900)));
     broadcast(room, { t:'game_started', d:{} });
-    broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),capital:p.capital,alive:p.alive})) } } });
+    broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),capital:p.capital,alive:p.alive,socketId:p.socketId,color:p.color})) } } });
   } else if(t==='action'){
     const room = findRoomByWs(ws);
     if(!room) return;
     const action = d.action;
     if(action.type==='move'){
       moveTroopsServer(room.grid, room.players, action.from, action.to, action.ratio);
-      // broadcast updated authoritative state to all players
-      broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),capital:p.capital,alive:p.alive})) } } });
+      broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),capital:p.capital,alive:p.alive,socketId:p.socketId,color:p.color})) } } });
     }
   }
 }
