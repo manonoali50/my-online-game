@@ -3,31 +3,32 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Territorial — Stable Final (With Effects)</title>
+<title>Territorial — Final</title>
 <style>
-/* styles omitted for brevity — same as original (kept intact) */
-html,body{margin:0;padding:0;overflow:hidden;background:#0d1117;font-family:Tahoma,Arial,sans-serif}
+html,body{margin:0;padding:0;overflow:hidden;background:#070606;font-family:Tahoma,Arial,sans-serif;color:#e6e6e6}
 canvas{display:block;touch-action:none}
-#lobby{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0d1117,#111827,#1a2333);animation:bgMove 8s infinite alternate}
-@keyframes bgMove{0%{filter:brightness(1)}100%{filter:brightness(1.12)}}
-.card{background:rgba(6,10,18,0.7);backdrop-filter:blur(8px);padding:24px;border-radius:14px;width:360px;box-shadow:0 12px 40px rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.04);color:#e6eef8}
-.card h1{margin:0 0 12px;font-size:20px;text-align:center}
-#telegramTag{font-size:20px;font-weight:700;color:#ff3333;text-align:center;margin-bottom:10px;text-shadow:0 0 8px rgba(255,0,0,0.12),0 0 18px rgba(255,0,0,0.06)}
-label{display:block;color:#aeb9c8;margin-top:10px}
-select,input[type=range]{width:100%;margin:8px 0;padding:10px;border-radius:10px;border:none;background:#101521;color:#fff}
+/* LUXURY BLACK-GOLD THEME */
+#lobby{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#050405,#0b0a0a);animation:bgMove 8s infinite alternate}
+@keyframes bgMove{0%{filter:brightness(1)}100%{filter:brightness(1.06)}}
+.card{background:linear-gradient(180deg,rgba(255,215,80,0.03),rgba(255,215,80,0.01));border:1px solid rgba(255,215,80,0.06);padding:22px;border-radius:14px;width:420px;box-shadow:0 14px 50px rgba(0,0,0,0.6)}
+.card h1{margin:0 0 12px;font-size:20px;text-align:center;color:#ffd96b}
+label{display:block;color:#d9c98a;margin-top:8px;font-weight:700}
+select,input[type=range],input[type=text]{width:100%;margin:8px 0;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:rgba(0,0,0,0.45);color:#fff}
 button{padding:12px;border-radius:10px;border:none;cursor:pointer;font-weight:700}
-.green{background:#16a34a;color:white}
-#ratioBar{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;background:rgba(255,255,255,0.92);padding:10px 12px;border-radius:14px;display:flex;align-items:center;gap:12px;z-index:1800}
-#ratioBar input{width:160px}
+.green{background:#ffd54a;color:#070606}
+.blue{background:#06b6d4;color:#042022}
+.small{padding:8px;font-size:13px}
+#ratioBar{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;background:rgba(255,255,255,0.06);padding:10px 12px;border-radius:14px;display:flex;align-items:center;gap:12px;z-index:1800;color:#fff}
 #legend{position:fixed;left:12px;top:12px;z-index:1800;color:white;display:flex;flex-direction:column;gap:6px}
 .legend-item{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:8px}
 #dbg{position:fixed;right:8px;bottom:8px;z-index:2200;background:rgba(0,0,0,0.7);color:#fff;padding:8px;border-radius:8px;font-size:12px;display:none;max-width:40vw}
-#mainMenuBtn{position:fixed;right:12px;top:12px;z-index:2100;background:#2563eb;color:white;padding:8px 12px;border-radius:10px;box-shadow:0 8px 20px rgba(0,0,0,0.3);cursor:pointer}
-#victoryOverlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:3000}
-#victoryCard{background:linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03));backdrop-filter:blur(8px);padding:28px;border-radius:16px;text-align:center;color:white;box-shadow:0 30px 80px rgba(0,0,0,0.6)}
-#victoryCard h1{margin:8px 0 6px 0;font-size:32px}
-#victoryCard .crown{font-size:46px;filter:drop-shadow(0 8px 20px rgba(255,215,0,0.3))}
-#victoryCard button{margin-top:12px;padding:10px 16px;border-radius:10px;border:none;cursor:pointer}
+#mainMenuBtn{position:fixed;right:12px;top:12px;z-index:2100;background:#111827;color:white;padding:8px 12px;border-radius:10px;cursor:pointer}
+#onlinePage{display:none}
+#settingsPanel{display:none;background:rgba(255,215,80,0.04);border:1px solid rgba(255,215,80,0.06);padding:12px;border-radius:12px;margin-top:8px}
+#pingDisplay{position:fixed;right:12px;top:64px;background:rgba(0,0,0,0.6);color:#ffd54a;padding:6px 8px;border-radius:8px;font-weight:700;z-index:4000;display:none}
+#leaveRoomBtn{background:#ff6b6b;color:#fff;border-radius:8px;padding:8px 10px;border:none;cursor:pointer}
+.fade-in { animation: fadeIn 650ms ease both; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: translateY(0)} }
 </style>
 </head>
 <body>
@@ -35,110 +36,176 @@ button{padding:12px;border-radius:10px;border:none;cursor:pointer;font-weight:70
 <canvas id="game"></canvas>
 <canvas id="lineLayer" style="position:fixed;inset:0;pointer-events:none;z-index:1700"></canvas>
 
-<div id="ratioBar" aria-hidden="false">
-  <span style="font-weight:700">القوات:</span>
-  <input id="ratioSlider" type="range" min="10" max="100" value="50">
-  <span id="ratioValue">50%</span>
+<div id="ratioBar" aria-hidden="false" class="fade-in">
+  <span style="font-weight:700">القوات:</span>
+  <input id="ratioSlider" type="range" min="10" max="100" value="50">
+  <span id="ratioValue">50%</span>
 </div>
 
 <div id="mainMenuBtn" role="button">⟵ رجوع</div>
 
 <div id="lobby" role="dialog" aria-label="Lobby">
-  <div class="card">
-    <h1>لوبي اللعبة</h1>
-    <div id="telegramTag">@Z_S_T_O</div>
+  <div class="card fade-in">
+    <h1>لوبي اللعبة — الأسود × الذهبي</h1>
 
-    <label>عدد اللاعبين</label>
-    <select id="playerCount">
-      <option value="2">2</option>
-      <option value="3">3</option>
-      <option value="4" selected>4</option>
-    </select>
+    <label>اسم اللاعب</label>
+    <input id="playerName" type="text" placeholder="اكتب اسمك..." autocomplete="off">
 
-    <label>معدل الإنتاج (مللي ثانية)</label>
-    <input id="prodRate" type="range" min="300" max="2000" value="900">
+    <label>عدد اللاعبين</label>
+    <select id="playerCount">
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4" selected>4</option>
+    </select>
 
-    <div style="margin-top:12px">
-      <button id="startBtn" class="green" style="width:100%">ابدأ</button>
-    <button id="onlineBtnLocal" class="green" style="width:100%;background:#06b6d4;margin-top:8px">اونلاين (غرف)</button>
-    </div>
-  </div>
+    <label>معدل الإنتاج (مللي ثانية)</label>
+    <input id="prodRate" type="range" min="300" max="2000" value="900">
+
+    <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
+      <button id="startBtn" class="green" style="width:100%">ابدأ (أوفلاين)</button>
+      <button id="onlineBtnLocal" class="blue" style="width:100%">اونلاين (غرف)</button>
+      <div id="settingsPanelToggle" style="display:flex;gap:8px;margin-top:6px">
+        <button id="settingsBtn" class="small" style="flex:1;background:#111;color:#ffd54a;border-radius:8px">الإعدادات</button>
+      </div>
+    </div>
+
+    <div id="settingsPanel" aria-hidden="true">
+      <label style="margin-top:6px">الإعدادات الاحترافية</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span>عرض Ping</span>
+        <button id="togglePing" class="small" style="background:#ff6b6b;color:#fff;border-radius:8px">إيقاف</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+        <span>Menu Debug (Console M)</span>
+        <button id="toggleDebug" class="small" style="background:#ff6b6b;color:#fff;border-radius:8px">إيقاف</button>
+      </div>
+    </div>
+  </div>
 </div>
-
 
 <!-- FULLSCREEN ONLINE PAGE -->
-<div id="onlinePage" style="display:none;position:fixed;inset:0;z-index:3000;background:linear-gradient(180deg,#0d1117,#071022);color:#e6eef8;overflow:auto;padding:36px 12px">
-  <div style="max-width:840px;margin:0 auto">
-    <div style="display:flex;justify-content:flex-end;gap:8px">
-      <button id="onlineBack" style="background:#111827;color:white;padding:8px 12px;border-radius:10px;cursor:pointer">رجوع ⟵</button>
-      <button id="leaveRoomBtn" style="background:#ef4444;color:white;padding:8px 12px;border-radius:10px;cursor:pointer;display:none">مغادرة الغرفة</button>
-    </div>
-    <h1 style="text-align:center;margin:18px 0;font-size:28px">اونلاين — نظام الغرف</h1>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
-      <div style="background:rgba(6,10,18,0.7);padding:18px;border-radius:12px">
-        <h2 style="margin:0 0 8px">إنشاء غرفة</h2>
-        <input id="roomName" placeholder="اسم الغرفة (اختياري)" style="width:100%;padding:10px;border-radius:8px;border:none;background:#0b1220;color:#fff;margin-bottom:8px">
-        <label style="display:block;margin-bottom:6px">الحد الأقصى للاعبين</label>
-        <select id="roomMax" style="width:100%;padding:10px;border-radius:8px;border:none;background:#0b1220;color:#fff;margin-bottom:10px">
-          <option value="2">2 لاعبين</option><option value="3">3 لاعبين</option><option value="4" selected>4 لاعبين</option>
-        </select>
-        <div style="display:flex;gap:8px">
-          <button id="createRoom" class="green" style="flex:1">إنشاء</button>
-          <button id="startRoom" style="flex:1;background:#10b981;color:#fff;border-radius:8px;border:none;cursor:pointer">بدء (مضيف فقط)</button>
-        </div>
-        <div id="roomInfo" style="margin-top:10px;font-size:13px;color:#9fb2c6"></div>
-      </div>
-      <div style="background:rgba(6,10,18,0.7);padding:18px;border-radius:12px">
-        <h2 style="margin:0 0 8px">انضمام لغرفة</h2>
-        <input id="joinCode" placeholder="رمز الغرفة" style="width:100%;padding:10px;border-radius:8px;border:none;background:#0b1220;color:#fff;margin-bottom:8px">
-        <button id="joinRoom" class="green" style="width:100%">انضمام</button>
-        <div style="margin-top:12px">
-          <h3 style="margin:0 0 6px">اللاعبين في الغرفة</h3>
-          <ul id="playerList" style="list-style:none;padding:0;margin:0;color:#dbeafe"></ul>
-        </div>
-      </div>
-    </div>
-    <div style="margin-top:18px;color:#9fb2c6;font-size:13px">ملاحظة: الأونلاين يعمل بنظام WebSocket. عند بدء اللعبة تكون الخريطة متزامنة بين اللاعبين بدون بوتات.</div>
-  </div>
+<div id="onlinePage" style="display:none;position:fixed;inset:0;z-index:3000;background:linear-gradient(180deg,#050405,#081018);color:#e6eef8;overflow:auto;padding:36px 12px">
+  <div style="max-width:840px;margin:0 auto">
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button id="onlineBack" style="background:#111827;color:white;padding:8px 12px;border-radius:10px;cursor:pointer">رجوع ⟵</button>
+      <button id="leaveRoomUI" style="display:none" class="small">خروج من الغرفة</button>
+    </div>
+    <h1 style="text-align:center;margin:18px 0;font-size:28px;color:#ffd54a">اونلاين — نظام الغرف</h1>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+      <div style="background:rgba(255,215,80,0.03);padding:18px;border-radius:12px">
+        <h2 style="margin:0 0 8px;color:#ffd54a">إنشاء غرفة</h2>
+        <label>الحد الأقصى للاعبين</label>
+        <select id="roomMax" style="width:100%;padding:10px;border-radius:8px;border:none;background:#0b1220;color:#fff;margin-bottom:10px">
+          <option value="2">2 لاعبين</option><option value="3">3 لاعبين</option><option value="4" selected>4 لاعبين</option>
+        </select>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="createRoom" class="green" style="flex:1">إنشاء</button>
+          <button id="startRoom" class="green" style="flex:1;background:#ffd54a;color:#000">بدء (مضيف فقط)</button>
+        </div>
+        <div id="roomInfo" style="margin-top:10px;font-size:13px;color:#d0c68a"></div>
+      </div>
+      <div style="background:rgba(255,215,80,0.02);padding:18px;border-radius:12px">
+        <h2 style="margin:0 0 8px;color:#ffd54a">انضمام لغرفة</h2>
+        <label>رمز الغرفة</label>
+        <input id="joinCode" placeholder="رمز الغرفة" style="width:100%;padding:10px;border-radius:8px;border:none;background:#0b1220;color:#fff;margin-bottom:8px">
+        <button id="joinRoom" class="green" style="width:100%">انضمام</button>
+        <div style="margin-top:12px">
+          <h3 style="margin:0 0 6px;color:#ffd54a">اللاعبين في الغرفة</h3>
+          <ul id="playerList" style="list-style:none;padding:0;margin:0;color:#fff"></ul>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:18px;color:#d0c68a;font-size:13px">ملاحظة: الأونلاين يعمل بنظام WebSocket. عند بدء اللعبة تكون الخريطة متزامنة بين اللاعبين بدون بوتات.</div>
+  </div>
 </div>
 
-<div id="legend" aria-hidden="true"></div>
+<div id="legend" aria-hidden="true"></div>\n<div id="pingDisplay" style="position:fixed;left:12px;bottom:12px;z-index:4000;background:rgba(0,0,0,0.6);color:#fff;padding:6px 8px;border-radius:8px;font-size:12px;display:none">Ping: <span id="pingValue">0</span> ms</div>
 <div id="dbg" role="status"></div>
-
-<div id="victoryOverlay"><div id="victoryCard"><div class="crown">👑</div><h1 id="victoryText"></h1><div id="victorName" style="font-size:20px;margin-top:6px"></div><button id="victoryToLobby" class="green">العودة للّوبي</button></div></div>
+<div id="pingDisplay">PING: <span id="pingValue">0</span> ms</div>
 
 <script>
 var grid = [];
+</script>
 
+<!-- Game logic (client) - trimmed/cleaned with online support -->
+<script>
 document.addEventListener('DOMContentLoaded', ()=>{
   'use strict';
   const HEX = 34;
-  const DEFEND_RADIUS = HEX * 3.2;
   const gameCanvas = document.getElementById('game');
   const lineCanvas = document.getElementById('lineLayer');
-  const dbg = document.getElementById('dbg');
   const ratioSlider = document.getElementById('ratioSlider');
   const ratioValue = document.getElementById('ratioValue');
   const startBtn = document.getElementById('startBtn');
   const playerCount = document.getElementById('playerCount');
   const prodRate = document.getElementById('prodRate');
   const legendEl = document.getElementById('legend');
-  const mainMenuBtn = document.getElementById('mainMenuBtn');
-  const victoryOverlay = document.getElementById('victoryOverlay');
-  const victoryText = document.getElementById('victoryText');
-  const victorName = document.getElementById('victorName');
-  const victoryToLobby = document.getElementById('victoryToLobby');
+  const onlineBtnLocal = document.getElementById('onlineBtnLocal');
+  const onlinePage = document.getElementById('onlinePage');
+  const onlineBack = document.getElementById('onlineBack');
+  const createRoomBtn = document.getElementById('createRoom');
+  const joinRoomBtn = document.getElementById('joinRoom');
+  const startRoomBtn = document.getElementById('startRoom');
+  const roomInfo = document.getElementById('roomInfo');
+  const playerList = document.getElementById('playerList');
+  const joinCodeInput = document.getElementById('joinCode');
+  const roomMaxSelect = document.getElementById('roomMax');
+  const playerNameInput = document.getElementById('playerName');
+  const leaveRoomUI = document.getElementById('leaveRoomUI');
+  const leaveRoomBtn = document.getElementById('leaveRoomBtn');
+  const settingsBtn = document.getElementById('settingsBtn');
+  const settingsPanel = document.getElementById('settingsPanel');
+  const togglePing = document.getElementById('togglePing');
+  const toggleDebug = document.getElementById('toggleDebug');
+  const pingDisplay = document.getElementById('pingDisplay');
+  const pingValueEl = document.getElementById('pingValue');
 
-  if(!gameCanvas || !lineCanvas){ dbg.style.display='block'; dbg.textContent='خطأ: عناصر الرسم غير موجودة'; return; }
+  let showPing = false;
+  let debugEnabled = false;
+  let needRender = true;
+
+  // simple ping hook from socket client
+  window.onPing = function(ms){
+    if(showPing){ pingValueEl.textContent = (ms===null? '--': String(ms)); pingDisplay.style.display='block'; }
+  };
+
+  settingsBtn && settingsBtn.addEventListener('click', ()=>{
+    settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'block' : 'none';
+  });
+  togglePing && togglePing.addEventListener('click', ()=>{
+    showPing = !showPing;
+    togglePing.style.background = showPing? '#16a34a' : '#ff6b6b';
+    if(!showPing) pingDisplay.style.display='none';
+  });
+  toggleDebug && toggleDebug.addEventListener('click', ()=>{
+    debugEnabled = !debugEnabled;
+    toggleDebug.style.background = debugEnabled? '#16a34a' : '#ff6b6b';
+    document.getElementById('debugToggle').style.display = debugEnabled? 'block':'none';
+  });
+
+  // Debug logger
+  window.debugLogs = [];
+  function debugLog(msg){
+    try{
+      const pre = document.getElementById('consoleLog');
+      const time = new Date().toLocaleTimeString();
+      const line = '['+time+'] ' + (typeof msg === 'object' ? JSON.stringify(msg) : msg);
+      window.debugLogs.push(line);
+      if(pre){
+        pre.textContent = window.debugLogs.slice(-500).join("\n") + "\n";
+        pre.scrollTop = pre.scrollHeight;
+      }
+      if(debugEnabled) console.log('DEBUG:', msg);
+    }catch(e){ console.log('debugLog failed', e); }
+  }
+  window._debugLog = debugLog;
+
+  // canvas setup (kept simpler)
   const ctx = gameCanvas.getContext('2d');
   const lctx = lineCanvas.getContext('2d');
-  if(!ctx || !lctx){ dbg.style.display='block'; dbg.textContent='خطأ: تعذر إنشاء سياق 2D'; return; }
-
-  let W = 0, H = 0;
-  let needRender = true;
-  function resize(){ W = gameCanvas.width = window.innerWidth || 300; H = gameCanvas.height = window.innerHeight || 200; lineCanvas.width = W; lineCanvas.height = H; needRender = true; }
-  window.addEventListener('resize', resize);
-  resize();
+  let W=0, H=0;
+  function resize(){ W = gameCanvas.width = window.innerWidth || 300; H = gameCanvas.height = window.innerHeight || 200; lineCanvas.width = W; lineCanvas.height = H; needRender=true; }
+  window.addEventListener('resize', resize); resize();
 
   var players = [];
   var cam = { x:0, y:0, scale:1 };
@@ -146,479 +213,320 @@ document.addEventListener('DOMContentLoaded', ()=>{
   var animations = [];
   var effects = [];
   var prodTimer = null, botTimer = null;
-  var dragging = false, lastX = 0, lastY = 0;
+  var dragging=false,lastX=0,lastY=0;
 
-  // helper flags
-  window.isOnline = false;
-  window.isInRoom = false;
-
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  const audioCtx = AudioCtx ? new AudioCtx() : null;
-  function playTone(freq, duration=0.3, type='sine'){ if(!audioCtx) return; const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.type = type; o.frequency.value = freq; o.connect(g); g.connect(audioCtx.destination); const now = audioCtx.currentTime; g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.12, now + 0.01); o.start(now); g.gain.exponentialRampToValueAtTime(0.0001, now + duration); o.stop(now + duration + 0.02); }
-  function playVictorySound(){ playTone(880,0.5,'sine'); setTimeout(()=>playTone(660,0.35,'sine'),120); }
-  function playEliminatedSound(){ playTone(180,0.22,'sawtooth'); }
-  function playCaptureSound(){ playTone(520,0.18,'triangle'); }
-  function playCapitalCapture(){ playTone(760,0.45,'sine'); setTimeout(()=>playTone(520,0.3,'triangle'),160); }
-
-  function renderSafe(){ try{ updateAnimations(16); render(); }catch(e){ console.error(e); dbg.style.display='block'; dbg.textContent = String(e); } }
-
-  function HEXR(){ return HEX; }
   function buildGrid(){
-    grid.length = 0;
-    const cols = Math.max(8, Math.floor(W / (HEXR() * 1.6)));
-    const rows = Math.max(6, Math.floor(H / (HEXR() * 1.25)));
+    grid.length=0;
+    const cols = Math.max(8, Math.floor(W / (HEX * 1.6)));
+    const rows = Math.max(6, Math.floor(H / (HEX * 1.25)));
     const startX = -cols * HEX * 0.85;
     const startY = -rows * HEX * 0.95;
     for(let r=0;r<rows;r++){
       for(let c=0;c<cols;c++){
         const x = startX + c * HEX * 1.7 + (r % 2 ? HEX * 0.85 : 0);
         const y = startY + r * HEX * 1.45;
-        grid.push({ x, y, owner:null, troops:0, neighbors:[] });
+        grid.push({ x,y, owner:null, troops:0, neighbors:[] });
       }
     }
     for(let i=0;i<grid.length;i++){
-      const a = grid[i];
+      const a=grid[i];
       for(let j=0;j<grid.length;j++){
         if(i===j) continue;
-        const b = grid[j];
-        if(Math.hypot(a.x - b.x, a.y - b.y) < HEX * 1.75) a.neighbors.push(j);
+        const b=grid[j];
+        if(Math.hypot(a.x-b.x,a.y-b.y) < HEX * 1.75) a.neighbors.push(j);
       }
     }
-    needRender = true;
+    needRender=true;
   }
 
   function worldToScreen(x,y){ return { x:(x + cam.x) * cam.scale + W/2, y:(y + cam.y) * cam.scale + H/2 }; }
   function screenToWorld(sx,sy){ return { x:(sx - W/2) / cam.scale - cam.x, y:(sy - H/2) / cam.scale - cam.y }; }
-  function drawHex(cx,cy,r){ ctx.beginPath(); for(let i=0;i<6;i++){ const a=Math.PI/3*i + Math.PI/6; const x=cx+Math.cos(a)*r; const y=cy+Math.sin(a)*r; if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); } ctx.closePath(); }
-  function cellAt(wx,wy){ if(!grid || grid.length===0) return null; let best=null, bd=HEX*1.05; for(let i=0;i<grid.length;i++){ const d=Math.hypot(grid[i].x-wx, grid[i].y-wy); if(d<bd){ bd=d; best=i; } } return best; }
+  function drawHex(cx,cy,r){ ctx.beginPath(); for(let i=0;i<6;i++){ const a=Math.PI/3*i + Math.PI/6; const x=cx+Math.cos(a)*r; const y=cy+Math.sin(a)*r; if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);} ctx.closePath(); }
+  function cellAt(wx,wy){ if(!grid||grid.length===0) return null; let best=null, bd=HEX*1.05; for(let i=0;i<grid.length;i++){ const d=Math.hypot(grid[i].x-wx, grid[i].y-wy); if(d<bd){ bd=d; best=i; } } return best; }
   function isNeighbor(a,b){ if(!grid||!grid[a]||!grid[b]) return false; return Math.hypot(grid[a].x-grid[b].x, grid[a].y-grid[b].y) < HEX * 1.8; }
 
   function setupPlayers(n){
-    players = [];
-    const usedColors = new Set();
+    players=[];
+    const used = new Set();
     const colorPool = ['#3399ff','#ff5555','#ffe047','#8a60ff','#00c48c','#ff8800','#33ffaa','#aa33ff','#ff33aa'];
     for(let i=0;i<n;i++){
       let color;
-      do { color = colorPool[Math.floor(Math.random() * colorPool.length)]; } while(usedColors.has(color));
-      usedColors.add(color);
+      do{ color = colorPool[Math.floor(Math.random()*colorPool.length)]; } while(used.has(color));
+      used.add(color);
       players.push({ id:i, color:color, name:'P'+(i+1), capital:null, alive:true });
     }
     updateLegend();
-    needRender = true;
+    needRender=true;
   }
 
   function seedCapitals(){
     if(!grid || grid.length===0) buildGrid();
-    grid.forEach(c => { c.owner=null; c.troops=0; });
-
+    grid.forEach(c=>{ c.owner=null; c.troops=0; });
     const xs = grid.map(c=>c.x), ys = grid.map(c=>c.y);
     const cxMin = Math.min(...xs), cxMax = Math.max(...xs);
     const cyMin = Math.min(...ys), cyMax = Math.max(...ys);
     const corners = [[cxMin,cyMin],[cxMax,cyMin],[cxMin,cyMax],[cxMax,cyMax]];
-
-    for(let p=0; p<players.length; p++){
-      const pt = corners[p % corners.length];
+    // randomize assignment
+    const order = corners.sort(()=>Math.random()-0.5);
+    for(let p=0;p<players.length;p++){
+      const pt = order[p % order.length];
       let bestIdx=0, bestD=Infinity;
-      for(let i=0; i<grid.length; i++){
-        const d = Math.hypot(grid[i].x - pt[0], grid[i].y - pt[1]);
-        if(d < bestD){ bestD = d; bestIdx = i; }
-      }
+      for(let i=0;i<grid.length;i++){ const d=Math.hypot(grid[i].x-pt[0], grid[i].y-pt[1]); if(d<bestD){ bestD=d; bestIdx=i; } }
       grid[bestIdx].owner = players[p].id;
       grid[bestIdx].troops = 40;
       players[p].capital = bestIdx;
     }
-    needRender = true;
+    needRender=true;
   }
 
   function startProduction(ms){ if(prodTimer) clearInterval(prodTimer); prodTimer = setInterval(()=>{ if(grid && grid.length) grid.forEach(c=>{ if(c.owner != null) c.troops++; }); }, Math.max(50, parseInt(ms,10) || 900)); }
 
-  function animateMove(fromIdx,toIdx,color){ if(!grid||!grid[fromIdx]||!grid[toIdx]) return; animations.push({ fromIdx,toIdx,color,t:0 }); needRender = true; }
-  function updateAnimations(delta){ lctx.clearRect(0,0,W,H); if(!grid||grid.length===0) return; const remaining=[]; for(const a of animations){ a.t += delta*0.004; if(a.t>=1) continue; const A = worldToScreen(grid[a.fromIdx].x, grid[a.fromIdx].y); const B = worldToScreen(grid[a.toIdx].x, grid[a.toIdx].y); const x = A.x + (B.x - A.x) * a.t; const y = A.y + (B.y - A.y) * a.t; lctx.beginPath(); lctx.fillStyle = a.color; lctx.arc(x,y,6*Math.max(0.6,cam.scale),0,Math.PI*2); lctx.fill(); remaining.push(a); } animations = remaining; if(animations.length>0) needRender = true; }
+  function animateMove(fromIdx,toIdx,color){ if(!grid||!grid[fromIdx]||!grid[toIdx]) return; animations.push({ fromIdx,toIdx,color,t:0 }); needRender=true; }
+  function updateAnimations(delta){ lctx.clearRect(0,0,W,H); if(!grid||grid.length===0) return; const remaining=[]; for(const a of animations){ a.t += delta*0.004; if(a.t>=1) continue; const A = worldToScreen(grid[a.fromIdx].x, grid[a.fromIdx].y); const B = worldToScreen(grid[a.toIdx].x, grid[a.toIdx].y); const x = A.x + (B.x - A.x) * a.t; const y = A.y + (B.y - A.y) * a.t; lctx.beginPath(); lctx.fillStyle = a.color; lctx.arc(x,y,6*Math.max(0.6,cam.scale),0,Math.PI*2); lctx.fill(); remaining.push(a); } animations = remaining; if(animations.length>0) needRender=true; }
 
-  function captureEffect(cellIdx){
-    const cell = grid[cellIdx]; if(!cell) return;
-    const s = worldToScreen(cell.x, cell.y);
-    effects.push({ type:'pulse', x:s.x, y:s.y, r:0, t:0, max: Math.max(W,H)*0.12 });
-    playCapitalCapture();
-    needRender = true;
-  }
-
-  function updateEffects(dt){
-    lctx.clearRect(0,0,W,H);
-    const keep = [];
-    for(const e of effects){
-      e.t += dt;
-      if(e.type==='pulse'){
-        e.r = e.t * 0.4 * (1 + cam.scale);
-        const alpha = Math.max(0, 0.8 - e.t*0.008);
-        lctx.beginPath(); lctx.arc(e.x, e.y, e.r, 0, Math.PI*2);
-        lctx.strokeStyle = 'rgba(255,215,80,'+alpha+')';
-        lctx.lineWidth = Math.max(2, 6 * cam.scale);
-        lctx.stroke();
-        if(e.t < 80){ lctx.fillStyle = 'rgba(255,240,200,' + (0.12 + (80 - e.t)/800) + ')'; lctx.beginPath(); lctx.arc(e.x, e.y, Math.min(e.r, e.max*0.25), 0, Math.PI*2); lctx.fill(); }
-        if(e.t < 220) keep.push(e);
-      }
-    }
-    effects.length = 0; Array.prototype.push.apply(effects, keep);
-    if(keep.length>0) needRender = true;
-  }
-
-  function moveTroops(fromIdx,toIdx,ratio){
+  function moveTroopsLocal(fromIdx,toIdx,ratio){
     if(!grid||!grid[fromIdx]||!grid[toIdx]) return;
-    const f = grid[fromIdx], t = grid[toIdx];
+    const f=grid[fromIdx], t=grid[toIdx];
     const send = Math.floor(f.troops * ratio);
-    if(send <= 0) return;
+    if(send<=0) return;
     f.troops = Math.max(0, f.troops - send);
-    animateMove(fromIdx,toIdx, players[f.owner] ? players[f.owner].color : '#fff');
+    animateMove(fromIdx,toIdx, players[f.owner]?players[f.owner].color:'#fff');
     if(t.owner === f.owner){ t.troops += send; }
     else {
       if(send > t.troops){
         const defeatedOwner = t.owner;
         t.owner = f.owner;
         t.troops = send - t.troops;
-        playCaptureSound();
-        if(defeatedOwner != null && players[defeatedOwner] && players[defeatedOwner].capital === toIdx){
-          if(players[defeatedOwner]) players[defeatedOwner].alive = false;
-          for(const c of grid){ if(c.owner === defeatedOwner){ c.owner = null; c.troops = 0; } }
-          playEliminatedSound();
-          captureEffect(toIdx);
-          if(f.owner === 0) playVictorySound();
-          checkVictory();
+        if(defeatedOwner != null){
+          const defPlayer = players.find(p=>p.id===defeatedOwner);
+          if(defPlayer && defPlayer.capital === toIdx){
+            defPlayer.alive = false;
+            for(const c of grid){ if(c.owner===defeatedOwner){ c.owner=null; c.troops=0; } }
+          }
         }
       } else {
         t.troops = Math.max(0, t.troops - send);
       }
     }
-    needRender = true;
+    needRender=true;
   }
 
-  function botTick(){ /* bots only used in offline mode; in online we stop botTimer */ 
-    if(!grid||grid.length===0) return;
-    for(let p=1;p<players.length;p++){
-      const bot = players[p];
-      if(!bot || !bot.alive) continue;
-      const ownedIdx = grid.map((c,i)=>c.owner===p?i:null).filter(i=>i!==null);
-      if(ownedIdx.length===0) continue;
-      const borderCells = [];
-      for(const i of ownedIdx){
-        const cell = grid[i];
-        if(!cell) continue;
-        for(const n of cell.neighbors){
-          if(grid[n] && grid[n].owner != null && grid[n].owner !== p){
-            borderCells.push(i);
-            break;
-          }
-        }
-      }
-      for(const border of borderCells){
-        if(grid[border].troops > 6) continue;
-        const candidates = ownedIdx.filter(i=>i!==border && grid[i].troops>6);
-        if(candidates.length===0) continue;
-        candidates.sort((a,b)=> Math.hypot(grid[a].x - grid[border].x, grid[a].y - grid[border].y) - Math.hypot(grid[b].x - grid[border].x, grid[b].y - grid[border].y));
-        moveTroops(candidates[0], border, 0.6);
-      }
+  function applyState(state){
+    if(!state) return;
+    if(state.grid && Array.isArray(state.grid)) window.grid = state.grid;
+    if(state.players && Array.isArray(state.players)){
+      players = state.players.map(p=>({ id:p.index, color:p.color || '#999', name:p.name || ('P'+(p.index+1)), capital:p.capital, alive:!!p.alive }));
     }
-    for(let p=1;p<players.length;p++){
-      const bot = players[p];
-      if(!bot || !bot.alive) continue;
-      const capIdx = bot.capital;
-      if(typeof capIdx === 'number' && capIdx != null){
-        const cap = grid[capIdx];
-        if(cap){
-          const defendRadius = HEX * 3.2;
-          let threat = null;
-          let threatDist = Infinity;
-          for(let i=0;i<grid.length;i++){
-            const cell = grid[i];
-            if(cell.owner != null && cell.owner !== p){
-              const d = Math.hypot(cell.x - cap.x, cell.y - cap.y);
-              if(d < defendRadius && d < threatDist){
-                threatDist = d;
-                threat = i;
-              }
-            }
-          }
-          if(threat != null){
-            const friendlyCells = grid.map((c,idx)=> c.owner===p && c.troops>6 ? idx : null).filter(i=>i!==null);
-            if(friendlyCells.length>0){
-              friendlyCells.sort((a,b)=> Math.hypot(grid[a].x-cap.x,grid[a].y-cap.y)-Math.hypot(grid[b].x-cap.x,grid[b].y-cap.y));
-              const origin = friendlyCells[0];
-              moveTroops(origin, threat, 0.75);
-              continue;
-            }
-          }
-        }
-      }
-      const ownedIdx = grid.map((c,i)=>c.owner===p?i:null).filter(i=>i!==null);
-      if(ownedIdx.length===0) continue;
-      const originIdx = ownedIdx[Math.floor(Math.random()*ownedIdx.length)];
-      const origin = grid[originIdx];
-      if(!origin||origin.troops<5) continue;
-      const neighIdx = origin.neighbors.slice();
-      if(neighIdx.length===0) continue;
-      let weakestIdx = neighIdx[0];
-      for(const ni of neighIdx) if(grid[ni].troops < grid[weakestIdx].troops) weakestIdx = ni;
-      moveTroops(originIdx, weakestIdx, 0.5);
-    }
+    updateLegend();
+    needRender=true;
+  }
+  window.applyState = applyState;
+
+  function requestRender(){ needRender=true; }
+
+  function updateLegend(){ if(!legendEl) return; legendEl.innerHTML=''; for(const p of players){ const div=document.createElement('div'); div.className='legend-item'; div.innerHTML=`<div style="width:14px;height:10px;background:${p.color};border-radius:4px"></div><div style="font-size:13px">${p.name}</div>`; legendEl.appendChild(div);} }
+
+  function render(){ if(!ctx) return; if(!needRender) return;
+    ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,W,H); ctx.fillStyle='#070606'; ctx.fillRect(0,0,W,H); if(!grid||grid.length===0) return;
+    for(let i=0;i<grid.length;i++){ const c=grid[i]; const s=worldToScreen(c.x,c.y); drawHex(s.x,s.y,HEX*cam.scale); ctx.fillStyle = (c.owner==null)?'#cfcfcf': (players[c.owner]?players[c.owner].color:'#fff'); ctx.fill(); ctx.fillStyle='#000'; ctx.textAlign='center'; ctx.font=(14*Math.max(0.7,cam.scale))+'px Tahoma'; ctx.fillText(c.troops, s.x, s.y + (5*cam.scale)); }
+    for(const p of players){ if(p && p.capital != null && p.alive){ const c = grid[p.capital]; if(c){ const s=worldToScreen(c.x,c.y); ctx.beginPath(); ctx.lineWidth = Math.max(2,3*cam.scale); ctx.strokeStyle='rgba(255,215,0,0.95)'; ctx.arc(s.x,s.y,HEX*cam.scale+6*cam.scale,0,Math.PI*2); ctx.stroke(); ctx.fillStyle='rgba(255,215,0,0.95)'; ctx.font=(18*Math.max(0.7,cam.scale))+'px Tahoma'; ctx.textAlign='center'; ctx.fillText('★', s.x, s.y - (HEX*cam.scale + 4*cam.scale)); } } }
+    needRender=false;
   }
 
-  function drawCapitalMarker(cellIdx){ if(!grid[cellIdx]) return; const c = grid[cellIdx]; const s = worldToScreen(c.x, c.y); ctx.beginPath(); ctx.lineWidth = Math.max(2, 3 * cam.scale); ctx.strokeStyle = 'rgba(255,215,0,0.95)'; ctx.arc(s.x, s.y, HEX * cam.scale + 6 * cam.scale, 0, Math.PI*2); ctx.stroke(); ctx.fillStyle = 'rgba(255,215,0,0.95)'; ctx.font = (18 * Math.max(0.7, cam.scale)) + 'px Tahoma'; ctx.textAlign = 'center'; ctx.fillText('★', s.x, s.y - (HEX * cam.scale + 4 * cam.scale)); }
-
-  function render(){ if(!ctx) return; if(!needRender && animations.length===0 && effects.length===0) return;
-    ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,W,H); ctx.fillStyle = '#0d1117'; ctx.fillRect(0,0,W,H); if(!grid||grid.length===0) return;
-    for(let i=0;i<grid.length;i++){ const c = grid[i]; const s = worldToScreen(c.x, c.y); drawHex(s.x, s.y, HEX * cam.scale); ctx.fillStyle = c.owner == null ? '#ffffff' : players[c.owner] ? players[c.owner].color : '#fff'; ctx.fill(); if(i === selected){ ctx.strokeStyle = '#00ff00'; ctx.lineWidth = 3; ctx.stroke(); } ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.font = (14 * Math.max(0.7, cam.scale)) + 'px Tahoma'; ctx.fillText(c.troops, s.x, s.y + (5 * cam.scale)); }
-    for(const p of players){ if(p && p.capital != null && p.alive){ drawCapitalMarker(p.capital); } }
-    const now = performance.now();
-    for(const p of players){ if(!p || p.capital==null || !p.alive) continue; const capIdx = p.capital; const cap = grid[capIdx]; if(!cap) continue; let danger=false; for(let i=0;i<grid.length;i++){ const cell = grid[i]; if(cell.owner != null && cell.owner !== p.id){ const d = Math.hypot(cell.x - cap.x, cell.y - cap.y); if(d < DEFEND_RADIUS){ danger=true; break; } } } if(danger){ const s = worldToScreen(cap.x, cap.y); const blink = 0.5 + 0.5 * Math.sin(now * 0.015); ctx.save(); ctx.translate(s.x, s.y - (HEX * cam.scale + 18 * cam.scale)); ctx.scale(cam.scale, cam.scale); ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(7, 8); ctx.lineTo(-7, 8); ctx.closePath(); ctx.fillStyle = 'rgba(255,80,80,'+blink+')'; ctx.fill(); ctx.restore(); } }
-    needRender = false;
-  }
-
-  function updateLegend(){ if(!legendEl) return; legendEl.innerHTML = ''; for(const p of players){ const div = document.createElement('div'); div.className = 'legend-item'; div.innerHTML = `<div style="width:14px;height:10px;background:${p.color};border-radius:4px"></div><div style="font-size:13px">${p.name}</div>`; legendEl.appendChild(div); } }
-
-  function updateEffectsAndAnimations(dt){ updateAnimations(dt); updateEffects(dt); }
-
-  function checkVictory(){ const alive = players.filter(p=>p && p.alive); if(alive.length===1){ const winner = alive[0]; if(prodTimer) clearInterval(prodTimer); if(botTimer) clearInterval(botTimer); victoryText.textContent = 'الفائز هو:'; victorName.textContent = winner.name; victoryOverlay.style.display = 'flex'; playVictorySound(); } }
-
-  function returnToLobby(){ if(prodTimer) clearInterval(prodTimer); if(botTimer) clearInterval(botTimer); victoryOverlay.style.display = 'none'; document.getElementById('lobby').style.display = 'flex'; buildGrid(); setupPlayers(parseInt(playerCount.value,10)||4); seedCapitals(); updateLegend(); render(); }
-  if(mainMenuBtn) mainMenuBtn.addEventListener('click', returnToLobby); if(victoryToLobby) victoryToLobby.addEventListener('click', returnToLobby);
-
-  if(ratioSlider && ratioValue) ratioSlider.addEventListener('input', e=> ratioValue.textContent = e.target.value + '%');
-  gameCanvas.addEventListener('pointerdown', e=>{ dragging = true; lastX = e.clientX; lastY = e.clientY; gameCanvas.setPointerCapture && gameCanvas.setPointerCapture(e.pointerId); needRender = true; });
-  gameCanvas.addEventListener('pointerup', e=>{ dragging = false; gameCanvas.releasePointerCapture && gameCanvas.releasePointerCapture(e.pointerId); needRender = true; });
-  gameCanvas.addEventListener('pointermove', e=>{ if(!dragging) return; cam.x += (e.clientX - lastX) / cam.scale; cam.y += (e.clientY - lastY) / cam.scale; lastX = e.clientX; lastY = e.clientY; needRender = true; });
-  gameCanvas.addEventListener('click', e=>{ const pos = screenToWorld(e.clientX, e.clientY); const idx = cellAt(pos.x, pos.y); if(idx == null) return; const cell = grid[idx]; const isOnlineNow = window.isInRoom; if(selected === null){ // select only if player owns it (offline owner=0, online owner === my index)
-      const myIndex = (window.socketClient && window.socketClient.getPlayerIndex) ? window.socketClient.getPlayerIndex() : 0;
-      if(isOnlineNow){
-        if(cell.owner === myIndex) selected = idx;
-      } else {
+  // Input handling: when online (roomId present) send action to server
+  gameCanvas.addEventListener('click', e=>{
+    const pos = screenToWorld(e.clientX, e.clientY); const idx = cellAt(pos.x,pos.y); if(idx==null) return;
+    const cell = grid[idx];
+    const meIndex = (window.socketClient && window.socketClient.getPlayerIndex) ? window.socketClient.getPlayerIndex() : null;
+    const inRoom = (window.socketClient && window.socketClient.getRoomId && window.socketClient.getRoomId());
+    if(selected === null){
+      if(!inRoom){
         if(cell.owner === 0) selected = idx;
+      } else {
+        if(cell.owner === meIndex) selected = idx;
       }
     } else {
       if(idx !== selected && isNeighbor(selected, idx)){
         const ratio = ratioSlider ? parseInt(ratioSlider.value,10)/100 : 0.5;
-        if(window.isInRoom && window.socketClient){
-          // optimistic local update for smoothness
-          try{
-            moveTroops(selected, idx, ratio);
-            // send action to server
-            window.socketClient.sendAction({ type:'move', from:selected, to:idx, ratio });
-          }catch(e){ console.warn('online move failed', e); }
+        if(inRoom && window.socketClient && window.socketClient.sendAction){
+          window.socketClient.sendAction({ type:'move', from:selected, to:idx, ratio });
         } else {
-          moveTroops(selected, idx, ratio);
+          moveTroopsLocal(selected, idx, ratio);
         }
       }
       selected = null;
-    } needRender = true; });
+    }
+    requestRender();
+  });
 
-  function startGame(){ try{ if(!grid || grid.length < 8) buildGrid(); const cnt = playerCount ? Math.max(2, Math.min(4, parseInt(playerCount.value,10) || 4)) : 4; setupPlayers(cnt); seedCapitals(); startProduction(prodRate ? parseInt(prodRate.value,10) : 900); if(botTimer) clearInterval(botTimer); botTimer = setInterval(botTick, 900); document.getElementById('lobby').style.display = 'none'; updateLegend(); needRender = true; }catch(err){ console.error(err); dbg.style.display='block'; dbg.textContent = String(err); } }
-  window.startGame = startGame; if(startBtn) startBtn.addEventListener('click', startGame);
+  // -- Starter / lobby controls --
+  function startGameOffline(){ if(!grid || grid.length<8) buildGrid(); const cnt = Math.max(2, Math.min(4, parseInt(playerCount.value,10)||4)); setupPlayers(cnt); seedCapitals(); startProduction(prodRate?parseInt(prodRate.value,10):900); if(botTimer) clearInterval(botTimer); botTimer = setInterval(()=>{/* bots */},900); document.getElementById('lobby').style.display='none'; updateLegend(); needRender=true; }
+  startBtn && startBtn.addEventListener('click', startGameOffline);
+  onlineBtnLocal && onlineBtnLocal.addEventListener('click', ()=>{ document.getElementById('lobby').style.display='none'; onlinePage.style.display='block'; });
 
-  let last = performance.now(); function frame(now){ const dt = now - last; last = now; try{ updateEffectsAndAnimations(dt); if(needRender || animations.length>0 || effects.length>0){ render(); } }catch(e){ console.error(e); dbg.style.display='block'; dbg.textContent = String(e); } requestAnimationFrame(frame); } requestAnimationFrame(frame);
+  onlineBack && onlineBack.addEventListener('click', ()=>{ onlinePage.style.display='none'; document.getElementById('lobby').style.display='flex'; });
 
-  buildGrid(); setupPlayers(4); seedCapitals(); updateLegend(); needRender = true;
+  createRoomBtn && createRoomBtn.addEventListener('click', ()=>{
+    const maxPlayers = parseInt(roomMaxSelect.value,10)||4;
+    const name = (playerNameInput && playerNameInput.value) ? playerNameInput.value.trim() : null;
+    if(window.socketClient && window.socketClient.createRoom){
+      window.socketClient.createRoom({ name, maxPlayers });
+    }
+  });
+
+  joinRoomBtn && joinRoomBtn.addEventListener('click', ()=>{
+    const code = joinCodeInput.value.trim();
+    const name = (playerNameInput && playerNameInput.value) ? playerNameInput.value.trim() : null;
+    if(!code) return alert('ادخل رمز الغرفة');
+    if(window.socketClient && window.socketClient.joinRoom){
+      window.socketClient.joinRoom({ roomId: code, name });
+    }
+  });
+
+  startRoomBtn && startRoomBtn.addEventListener('click', ()=>{
+    if(window.socketClient && window.socketClient.startGame){
+      window.socketClient.startGame({ prodRate: parseInt(document.getElementById('prodRate').value,10) || 900 });
+    }
+  });
+
+  window.updateRoomPlayers = function(playersArr){
+    if(!playerList) return;
+    playerList.innerHTML='';
+    playersArr.forEach(p=>{ const li=document.createElement('li'); li.style.padding='6px 4px'; li.style.borderBottom='1px dashed rgba(255,255,255,0.02)'; li.innerHTML = `<span style="display:inline-block;width:12px;height:10px;background:${p.color||'#999'};margin-left:8px;border-radius:4px;"></span> ${(p.name||('P'+(p.index+1)))} ${p.isHost? ' <strong>👑</strong>':''}`; playerList.appendChild(li); });
+    leaveRoomUI.style.display = 'inline-block';
+  };
+
+  leaveRoomUI && leaveRoomUI.addEventListener('click', ()=>{
+    if(window.socketClient && window.socketClient.leaveRoom){ window.socketClient.leaveRoom(); leaveRoomUI.style.display='none'; onlinePage.style.display='none'; document.getElementById('lobby').style.display='flex'; }
+  });
+
+  // initial scene
+  buildGrid(); setupPlayers(4); seedCapitals(); updateLegend(); needRender=true;
+
+  // rendering loop
+  let last = performance.now();
+  function frame(now){
+    const dt = now - last; last = now;
+    try{ updateAnimations(dt); updateEffects(dt); render(); }catch(e){ console.error(e); }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // helper to display ping on interval when enabled
+  setInterval(()=>{ if(showPing && window.socketClient && window.socketClient.ping){ window.socketClient.ping((rtt)=>{ if(typeof rtt==='number'){ pingValueEl.textContent = rtt; pingDisplay.style.display='block'; } }); } }, 2000);
 
 });
 </script>
 
-<!-- DEBUG CONSOLE (toggle with M) -->
-<button id="debugToggle" title="Toggle Console (M)" style="position:fixed;left:12px;top:12px;z-index:4000;background:rgba(255,255,255,0.06);color:#fff;border:none;padding:8px 10px;border-radius:10px;cursor:pointer;font-weight:700">M</button>
+<!-- socket client inclusion -->
+<script src="socket-client.js"></script>
+
+<!-- debug console UI -->
+<button id="debugToggle" title="Toggle Console (M)" style="position:fixed;left:12px;top:12px;z-index:4000;background:rgba(255,255,255,0.02);color:#ffd54a;border:none;padding:8px 10px;border-radius:10px;cursor:pointer;font-weight:700;display:none">M</button>
 <div id="debugConsole" style="display:none;position:fixed;left:12px;top:56px;z-index:4000;width:360px;max-height:60vh;overflow:auto;background:rgba(2,6,23,0.9);border-radius:10px;padding:8px;color:#d1d5db;box-shadow:0 12px 40px rgba(0,0,0,0.6)">
-  <div style="display:flex;justify-content:flex-end"><button id="closeConsole" style="background:transparent;border:none;color:#f87171;font-weight:700;cursor:pointer">X</button></div>
-  <pre id="consoleLog" style="white-space:pre-wrap;font-size:12px;margin:0;height:60vh;overflow:auto"></pre>
+  <div style="display:flex;justify-content:flex-end"><button id="closeConsole" style="background:transparent;border:none;color:#f87171;font-weight:700;cursor:pointer">X</button></div>
+  <pre id="consoleLog" style="white-space:pre-wrap;font-size:12px;margin:0;height:60vh;overflow:auto"></pre>
 </div>
 
-
-<script src="socket-client.js"></script>
 <script>
-// Debug logger helper used by socket client and page
-window.debugLogs = [];
-function debugLog(msg){
-  try{
-    const pre = document.getElementById('consoleLog');
-    const time = new Date().toLocaleTimeString();
-    const line = '['+time+'] ' + (typeof msg === 'object' ? JSON.stringify(msg) : msg);
-    window.debugLogs.push(line);
-    if(pre){
-      pre.textContent = window.debugLogs.slice(-500).join("\n") + "\n";
-      pre.scrollTop = pre.scrollHeight;
-    }
-    console.log('DEBUG:', msg);
-  }catch(e){ console.log('debugLog failed', e); }
-}
-
-// Toggle debug console with M and button
-document.addEventListener('keydown', function(e){
-  if(e.key && e.key.toLowerCase() === 'm'){ toggleConsole(); }
-});
 document.getElementById('debugToggle').addEventListener('click', toggleConsole);
 document.getElementById('closeConsole').addEventListener('click', toggleConsole);
-function toggleConsole(){
-  const el = document.getElementById('debugConsole');
-  if(!el) return;
-  el.style.display = (el.style.display === 'none' ? 'block' : 'none');
-}
+function toggleConsole(){ const el=document.getElementById('debugConsole'); el.style.display = (el.style.display==='none'?'block':'none'); }
+document.addEventListener('keydown', function(e){ if(e.key && e.key.toLowerCase()==='m' && document.getElementById('debugToggle').style.display!=='none'){ toggleConsole(); } });
+</script>
 
-// Online page wiring
-const onlineBtnLocal = document.getElementById('onlineBtnLocal');
-const onlinePage = document.getElementById('onlinePage');
-const onlineBack = document.getElementById('onlineBack');
-const createRoomBtn = document.getElementById('createRoom');
-const joinRoomBtn = document.getElementById('joinRoom');
-const startRoomBtn = document.getElementById('startRoom');
-const roomInfo = document.getElementById('roomInfo');
-const playerList = document.getElementById('playerList');
-const joinCodeInput = document.getElementById('joinCode');
-const roomNameInput = document.getElementById('roomName');
-const roomMaxSelect = document.getElementById('roomMax');
-const leaveRoomBtn = document.getElementById('leaveRoomBtn');
 
-onlineBtnLocal && onlineBtnLocal.addEventListener('click', ()=>{ onlinePage.style.display='block'; document.getElementById('lobby').style.display='none'; });
-onlineBack && onlineBack.addEventListener('click', ()=>{ onlinePage.style.display='none'; document.getElementById('lobby').style.display='flex'; });
+// ===== Settings, Ping and Debug wiring (injected) =====
+(function(){
+  const settingsBtn = document.getElementById('settingsBtn');
+  const settingsModal = document.getElementById('settingsModal');
+  const settingsClose = document.getElementById('settingsClose');
+  const togglePing = document.getElementById('togglePing');
+  const toggleDebug = document.getElementById('toggleDebug');
+  const pingDisplay = document.getElementById('pingDisplay');
+  const pingValue = document.getElementById('pingValue');
 
-// socketClient assumed to be loaded via socket-client.js
-createRoomBtn && createRoomBtn.addEventListener('click', ()=>{
-  const name = roomNameInput.value || null;
-  const maxPlayers = parseInt(roomMaxSelect.value,10) || 4;
-  if(window.socketClient && window.socketClient.createRoom){
-    debugLog('Creating room...');
-    window.socketClient.createRoom({name, maxPlayers});
-  } else debugLog('socketClient not ready');
-});
+  // Load saved options or defaults
+  const opts = {
+    ping: localStorage.getItem('gw_ping') === '1',
+    debug: localStorage.getItem('gw_debug') === '1'
+  };
 
-joinRoomBtn && joinRoomBtn.addEventListener('click', ()=>{
-  const code = joinCodeInput.value.trim();
-  if(!code) return alert('ادخل رمز الغرفة');
-  if(window.socketClient && window.socketClient.joinRoom){
-    debugLog('Joining room ' + code);
-    window.socketClient.joinRoom({roomId: code});
-  } else debugLog('socketClient not ready');
-});
-
-startRoomBtn && startRoomBtn.addEventListener('click', ()=>{
-  if(window.socketClient && window.socketClient.startGame){
-    window.socketClient.startGame({prodRate: parseInt(document.getElementById('prodRate').value,10) || 900});
-  } else debugLog('startGame not available');
-});
-
-leaveRoomBtn && leaveRoomBtn.addEventListener('click', ()=>{
-  if(window.socketClient && window.socketClient.leaveRoom){
-    window.socketClient.leaveRoom();
-    window.isInRoom = false;
-    leaveRoomBtn.style.display = 'none';
-    roomInfo.textContent = '';
-    playerList.innerHTML = '';
-    document.getElementById('lobby').style.display = 'flex';
-    onlinePage.style.display = 'none';
+  function updateToggleButtons(){
+    togglePing.textContent = opts.ping ? 'تشغيل' : 'إيقاف';
+    togglePing.style.background = opts.ping ? '#16a34a' : '#ef4444';
+    toggleDebug.textContent = opts.debug ? 'تشغيل' : 'إيقاف';
+    toggleDebug.style.background = opts.debug ? '#16a34a' : '#ef4444';
+    pingDisplay.style.display = opts.ping ? 'block' : 'none';
   }
-});
+  updateToggleButtons();
 
-// helper to update player list UI from server state
-window.updateRoomPlayers = function(players){ 
-  if(!playerList) return;
-  playerList.innerHTML = '';
-  players.forEach(p=>{
-    const li = document.createElement('li');
-    li.textContent = (p.name || ('P'+(p.index+1))) + (p.isHost? ' (Host)':''); 
-    // show color swatch if available
-    if(p.color){
-      const sw = document.createElement('span');
-      sw.style.display='inline-block';
-      sw.style.width='12px';
-      sw.style.height='10px';
-      sw.style.background = p.color;
-      sw.style.marginLeft='8px';
-      sw.style.borderRadius='4px';
-      li.appendChild(sw);
+  if(settingsBtn) settingsBtn.addEventListener('click', ()=>{ settingsModal.style.display='flex'; });
+  if(settingsClose) settingsClose.addEventListener('click', ()=>{ settingsModal.style.display='none'; });
+
+  if(togglePing) togglePing.addEventListener('click', ()=>{
+    opts.ping = !opts.ping;
+    localStorage.setItem('gw_ping', opts.ping ? '1' : '0');
+    updateToggleButtons();
+    if(opts.ping){
+      startPingLoop();
+    } else {
+      if(window._stopPingLoop) window._stopPingLoop();
     }
-    playerList.appendChild(li);
   });
-};
+  if(toggleDebug) toggleDebug.addEventListener('click', ()=>{
+    opts.debug = !opts.debug;
+    localStorage.setItem('gw_debug', opts.debug ? '1' : '0');
+    updateToggleButtons();
+  });
 
-// expose debugLog to socket-client as well
-window._debugLog = debugLog;
-</script>
+  // override global toggleConsole to respect debug flag
+  const originalToggleConsole = window.toggleConsole || function(){};
+  window.toggleConsole = function(){
+    const dbg = localStorage.getItem('gw_debug') === '1';
+    if(!dbg) return;
+    originalToggleConsole();
+  };
 
-<script>
-/* applyState and online helpers: these will be called by socket-client.js when state arrives */
-window.applyState = function(state){
-  try{
-    if(!state) return;
-    if(state.grid && Array.isArray(state.grid)){
-      window.grid = state.grid;
+  // keydown M handler - ensure it only toggles when debug enabled
+  document.addEventListener('keydown', function(e){
+    if(e.key && e.key.toLowerCase() === 'm'){
+      const dbg = localStorage.getItem('gw_debug') === '1';
+      if(!dbg) return;
+      toggleConsole();
     }
-    if(state.players && Array.isArray(state.players)){
-      // server provides canonical players array (including color)
-      window.players = state.players.map(p=>{
-        // ensure defaults
-        return {
-          id: p.index,
-          index: p.index,
-          name: p.name || ('P'+(p.index+1)),
-          color: p.color || '#999999',
-          capital: (typeof p.capital!=='undefined') ? p.capital : null,
-          alive: (typeof p.alive!=='undefined') ? Boolean(p.alive) : true,
-          isHost: !!p.isHost
-        };
-      });
-    }
+  });
 
-    // update local UI
-    if(typeof updateLegend === 'function') try{ updateLegend(); }catch(e){}
-    if(typeof window.updateRoomPlayers === 'function'){
-      try{ window.updateRoomPlayers(window.players.map(p=>({index:p.index,name:p.name,isHost:p.isHost,color:p.color,capital:p.capital,alive:p.alive}))); }catch(e){}
-    }
-
-    // render quickly
-    if(typeof window.needRender !== 'undefined') window.needRender = true;
-  }catch(e){
-    console.error('applyState error', e);
-  }
-};
-
-window.startOnlineGame = function(state){
-  try{
-    if(!state) return;
-    window.isOnline = true;
-    window.isInRoom = true;
-    // adopt server grid + players
-    if(state.grid) window.grid = state.grid;
-    if(state.players) {
-      window.players = state.players.map(p=>({
-        id: p.index, index: p.index, name: p.name || ('P'+(p.index+1)), color:p.color || '#999', capital:p.capital||null, alive:!!p.alive, isHost:!!p.isHost
-      }));
-    }
-    // stop local bots and production
-    if(window.botTimer) { clearInterval(window.botTimer); window.botTimer = null; }
-    if(window.prodTimer) { clearInterval(window.prodTimer); window.prodTimer = null; }
-
-    // show leave button
-    const leaveBtn = document.getElementById('leaveRoomBtn');
-    if(leaveBtn) leaveBtn.style.display = 'inline-block';
-
-    // hide lobby, show game
-    const lobby = document.getElementById('lobby');
-    if(lobby) lobby.style.display = 'none';
-    const onlinePage = document.getElementById('onlinePage');
-    if(onlinePage) onlinePage.style.display = 'none';
-    const gameCanvas = document.getElementById('game');
-    if(gameCanvas) gameCanvas.style.display = 'block';
-
-    // set camera to this player's capital if we know index
-    try{
-      const meIndex = window.socketClient && window.socketClient.getPlayerIndex ? window.socketClient.getPlayerIndex() : null;
-      const me = (window.players||[]).find(p=>p.index===meIndex);
-      if(me && typeof me.capital === 'number' && window.grid && window.grid[me.capital]){
-        const cap = window.grid[me.capital];
-        if(window.cam){ window.cam.x = -cap.x; window.cam.y = -cap.y; window.cam.scale = Math.max(0.9,1.0); }
+  // Ping implementation: measure RTT using socket-client ping/pong messages.
+  let pingInterval = null;
+  window._stopPingLoop = function(){ if(pingInterval) clearInterval(pingInterval); pingInterval = null; };
+  function startPingLoop(){
+    if(pingInterval) clearInterval(pingInterval);
+    if(!localStorage.getItem('gw_ping') || localStorage.getItem('gw_ping') !== '1') return;
+    pingInterval = setInterval(()=>{
+      if(window.socketClient && window.socketClient._sendPing){
+        const ts = Date.now();
+        window.socketClient._sendPing(ts);
+      } else {
+        // can't ping (no server), hide ping
+        pingDisplay.style.display = 'none';
       }
-    }catch(e){ console.warn('camera set failed', e); }
-
-    if(typeof window.needRender !== 'undefined') window.needRender = true;
-  }catch(e){
-    console.error('startOnlineGame error', e);
+    }, 1500);
   }
-};
-</script>
+  // start immediately if enabled
+  if(localStorage.getItem('gw_ping') === '1') startPingLoop();
 
-</body>
+  // expose a function to update ping value when pong received
+  window._updatePingValue = function(ms){
+    if(pingValue) pingValue.textContent = Math.max(0,Math.round(ms));
+    if(pingDisplay) pingDisplay.style.display = (localStorage.getItem('gw_ping') === '1') ? 'block' : 'none';
+  };
+
+  // Hide settings if clicked outside card
+  settingsModal.addEventListener('click', (ev)=>{
+    if(ev.target === settingsModal) settingsModal.style.display = 'none';
+  });
+
+})();
+\n</body>
 </html>
