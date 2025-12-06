@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Territorial — Stable Final (With Effects)</title>
 <style>
-/* ... الاحتفاظ بنفس CSS من ملفك الأصلي (يمكنك نسخه كاملاً) ... */
+/* styles omitted for brevity — same as original (kept intact) */
 html,body{margin:0;padding:0;overflow:hidden;background:#0d1117;font-family:Tahoma,Arial,sans-serif}
 canvas{display:block;touch-action:none}
 #lobby{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0d1117,#111827,#1a2333);animation:bgMove 8s infinite alternate}
@@ -71,7 +71,7 @@ button{padding:12px;border-radius:10px;border:none;cursor:pointer;font-weight:70
   <div style="max-width:840px;margin:0 auto">
     <div style="display:flex;justify-content:flex-end;gap:8px">
       <button id="onlineBack" style="background:#111827;color:white;padding:8px 12px;border-radius:10px;cursor:pointer">رجوع ⟵</button>
-      <button id="leaveRoomBtn" style="background:#ef4444;color:white;padding:8px 12px;border-radius:10px;cursor:pointer;display:none">خروج من الغرفة</button>
+      <button id="leaveRoomBtn" style="background:#ef4444;color:white;padding:8px 12px;border-radius:10px;cursor:pointer;display:none">مغادرة الغرفة</button>
     </div>
     <h1 style="text-align:center;margin:18px 0;font-size:28px">اونلاين — نظام الغرف</h1>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
@@ -128,7 +128,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
   const victoryText = document.getElementById('victoryText');
   const victorName = document.getElementById('victorName');
   const victoryToLobby = document.getElementById('victoryToLobby');
-  const leaveRoomBtn = document.getElementById('leaveRoomBtn');
 
   if(!gameCanvas || !lineCanvas){ dbg.style.display='block'; dbg.textContent='خطأ: عناصر الرسم غير موجودة'; return; }
   const ctx = gameCanvas.getContext('2d');
@@ -148,6 +147,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
   var effects = [];
   var prodTimer = null, botTimer = null;
   var dragging = false, lastX = 0, lastY = 0;
+
+  // helper flags
+  window.isOnline = false;
+  window.isInRoom = false;
 
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   const audioCtx = AudioCtx ? new AudioCtx() : null;
@@ -198,7 +201,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
       let color;
       do { color = colorPool[Math.floor(Math.random() * colorPool.length)]; } while(usedColors.has(color));
       usedColors.add(color);
-      players.push({ id:i, color:color, name:'P'+(i+1), capital:null, alive:true, index:i });
+      players.push({ id:i, color:color, name:'P'+(i+1), capital:null, alive:true });
     }
     updateLegend();
     needRender = true;
@@ -261,7 +264,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
   }
 
   function moveTroops(fromIdx,toIdx,ratio){
-    // local moveTroops used only for offline/local games
     if(!grid||!grid[fromIdx]||!grid[toIdx]) return;
     const f = grid[fromIdx], t = grid[toIdx];
     const send = Math.floor(f.troops * ratio);
@@ -269,17 +271,102 @@ document.addEventListener('DOMContentLoaded', ()=>{
     f.troops = Math.max(0, f.troops - send);
     animateMove(fromIdx,toIdx, players[f.owner] ? players[f.owner].color : '#fff');
     if(t.owner === f.owner){ t.troops += send; }
-    else { if(send > t.troops){ const defeatedOwner = t.owner; t.owner = f.owner; t.troops = send - t.troops; playCaptureSound(); if(defeatedOwner != null && players[defeatedOwner] && players[defeatedOwner].capital === toIdx){ if(players[defeatedOwner]) players[defeatedOwner].alive = false; for(const c of grid){ if(c.owner === defeatedOwner){ c.owner = null; c.troops = 0; } } playEliminatedSound(); captureEffect(toIdx); if(f.owner === 0) playVictorySound(); checkVictory(); } } else { t.troops = Math.max(0, t.troops - send); } }
+    else {
+      if(send > t.troops){
+        const defeatedOwner = t.owner;
+        t.owner = f.owner;
+        t.troops = send - t.troops;
+        playCaptureSound();
+        if(defeatedOwner != null && players[defeatedOwner] && players[defeatedOwner].capital === toIdx){
+          if(players[defeatedOwner]) players[defeatedOwner].alive = false;
+          for(const c of grid){ if(c.owner === defeatedOwner){ c.owner = null; c.troops = 0; } }
+          playEliminatedSound();
+          captureEffect(toIdx);
+          if(f.owner === 0) playVictorySound();
+          checkVictory();
+        }
+      } else {
+        t.troops = Math.max(0, t.troops - send);
+      }
+    }
     needRender = true;
   }
 
-  function botTick(){ /* unchanged offline bot behavior — kept as in original for offline only */ }
+  function botTick(){ /* bots only used in offline mode; in online we stop botTimer */ 
+    if(!grid||grid.length===0) return;
+    for(let p=1;p<players.length;p++){
+      const bot = players[p];
+      if(!bot || !bot.alive) continue;
+      const ownedIdx = grid.map((c,i)=>c.owner===p?i:null).filter(i=>i!==null);
+      if(ownedIdx.length===0) continue;
+      const borderCells = [];
+      for(const i of ownedIdx){
+        const cell = grid[i];
+        if(!cell) continue;
+        for(const n of cell.neighbors){
+          if(grid[n] && grid[n].owner != null && grid[n].owner !== p){
+            borderCells.push(i);
+            break;
+          }
+        }
+      }
+      for(const border of borderCells){
+        if(grid[border].troops > 6) continue;
+        const candidates = ownedIdx.filter(i=>i!==border && grid[i].troops>6);
+        if(candidates.length===0) continue;
+        candidates.sort((a,b)=> Math.hypot(grid[a].x - grid[border].x, grid[a].y - grid[border].y) - Math.hypot(grid[b].x - grid[border].x, grid[b].y - grid[border].y));
+        moveTroops(candidates[0], border, 0.6);
+      }
+    }
+    for(let p=1;p<players.length;p++){
+      const bot = players[p];
+      if(!bot || !bot.alive) continue;
+      const capIdx = bot.capital;
+      if(typeof capIdx === 'number' && capIdx != null){
+        const cap = grid[capIdx];
+        if(cap){
+          const defendRadius = HEX * 3.2;
+          let threat = null;
+          let threatDist = Infinity;
+          for(let i=0;i<grid.length;i++){
+            const cell = grid[i];
+            if(cell.owner != null && cell.owner !== p){
+              const d = Math.hypot(cell.x - cap.x, cell.y - cap.y);
+              if(d < defendRadius && d < threatDist){
+                threatDist = d;
+                threat = i;
+              }
+            }
+          }
+          if(threat != null){
+            const friendlyCells = grid.map((c,idx)=> c.owner===p && c.troops>6 ? idx : null).filter(i=>i!==null);
+            if(friendlyCells.length>0){
+              friendlyCells.sort((a,b)=> Math.hypot(grid[a].x-cap.x,grid[a].y-cap.y)-Math.hypot(grid[b].x-cap.x,grid[b].y-cap.y));
+              const origin = friendlyCells[0];
+              moveTroops(origin, threat, 0.75);
+              continue;
+            }
+          }
+        }
+      }
+      const ownedIdx = grid.map((c,i)=>c.owner===p?i:null).filter(i=>i!==null);
+      if(ownedIdx.length===0) continue;
+      const originIdx = ownedIdx[Math.floor(Math.random()*ownedIdx.length)];
+      const origin = grid[originIdx];
+      if(!origin||origin.troops<5) continue;
+      const neighIdx = origin.neighbors.slice();
+      if(neighIdx.length===0) continue;
+      let weakestIdx = neighIdx[0];
+      for(const ni of neighIdx) if(grid[ni].troops < grid[weakestIdx].troops) weakestIdx = ni;
+      moveTroops(originIdx, weakestIdx, 0.5);
+    }
+  }
 
   function drawCapitalMarker(cellIdx){ if(!grid[cellIdx]) return; const c = grid[cellIdx]; const s = worldToScreen(c.x, c.y); ctx.beginPath(); ctx.lineWidth = Math.max(2, 3 * cam.scale); ctx.strokeStyle = 'rgba(255,215,0,0.95)'; ctx.arc(s.x, s.y, HEX * cam.scale + 6 * cam.scale, 0, Math.PI*2); ctx.stroke(); ctx.fillStyle = 'rgba(255,215,0,0.95)'; ctx.font = (18 * Math.max(0.7, cam.scale)) + 'px Tahoma'; ctx.textAlign = 'center'; ctx.fillText('★', s.x, s.y - (HEX * cam.scale + 4 * cam.scale)); }
 
   function render(){ if(!ctx) return; if(!needRender && animations.length===0 && effects.length===0) return;
     ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,W,H); ctx.fillStyle = '#0d1117'; ctx.fillRect(0,0,W,H); if(!grid||grid.length===0) return;
-    for(let i=0;i<grid.length;i++){ const c = grid[i]; const s = worldToScreen(c.x, c.y); drawHex(s.x, s.y, HEX * cam.scale); ctx.fillStyle = c.owner == null ? '#ffffff' : (players[c.owner] ? players[c.owner].color : '#fff'); ctx.fill(); if(i === selected){ ctx.strokeStyle = '#00ff00'; ctx.lineWidth = 3; ctx.stroke(); } ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.font = (14 * Math.max(0.7, cam.scale)) + 'px Tahoma'; ctx.fillText(c.troops, s.x, s.y + (5 * cam.scale)); }
+    for(let i=0;i<grid.length;i++){ const c = grid[i]; const s = worldToScreen(c.x, c.y); drawHex(s.x, s.y, HEX * cam.scale); ctx.fillStyle = c.owner == null ? '#ffffff' : players[c.owner] ? players[c.owner].color : '#fff'; ctx.fill(); if(i === selected){ ctx.strokeStyle = '#00ff00'; ctx.lineWidth = 3; ctx.stroke(); } ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.font = (14 * Math.max(0.7, cam.scale)) + 'px Tahoma'; ctx.fillText(c.troops, s.x, s.y + (5 * cam.scale)); }
     for(const p of players){ if(p && p.capital != null && p.alive){ drawCapitalMarker(p.capital); } }
     const now = performance.now();
     for(const p of players){ if(!p || p.capital==null || !p.alive) continue; const capIdx = p.capital; const cap = grid[capIdx]; if(!cap) continue; let danger=false; for(let i=0;i<grid.length;i++){ const cell = grid[i]; if(cell.owner != null && cell.owner !== p.id){ const d = Math.hypot(cell.x - cap.x, cell.y - cap.y); if(d < DEFEND_RADIUS){ danger=true; break; } } } if(danger){ const s = worldToScreen(cap.x, cap.y); const blink = 0.5 + 0.5 * Math.sin(now * 0.015); ctx.save(); ctx.translate(s.x, s.y - (HEX * cam.scale + 18 * cam.scale)); ctx.scale(cam.scale, cam.scale); ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(7, 8); ctx.lineTo(-7, 8); ctx.closePath(); ctx.fillStyle = 'rgba(255,80,80,'+blink+')'; ctx.fill(); ctx.restore(); } }
@@ -299,43 +386,35 @@ document.addEventListener('DOMContentLoaded', ()=>{
   gameCanvas.addEventListener('pointerdown', e=>{ dragging = true; lastX = e.clientX; lastY = e.clientY; gameCanvas.setPointerCapture && gameCanvas.setPointerCapture(e.pointerId); needRender = true; });
   gameCanvas.addEventListener('pointerup', e=>{ dragging = false; gameCanvas.releasePointerCapture && gameCanvas.releasePointerCapture(e.pointerId); needRender = true; });
   gameCanvas.addEventListener('pointermove', e=>{ if(!dragging) return; cam.x += (e.clientX - lastX) / cam.scale; cam.y += (e.clientY - lastY) / cam.scale; lastX = e.clientX; lastY = e.clientY; needRender = true; });
-
-  gameCanvas.addEventListener('click', e=>{
-    const pos = screenToWorld(e.clientX, e.clientY);
-    const idx = cellAt(pos.x, pos.y);
-    if(idx == null) return;
-    const cell = grid[idx];
-    // get local player index if online
-    const onlineIndex = (window.socketClient && typeof window.socketClient.getPlayerIndex === 'function') ? window.socketClient.getPlayerIndex() : null;
-    if(selected === null){
-      // selecting: only allow selecting your own cell
-      if(onlineIndex !== null && onlineIndex !== undefined){
-        if(cell.owner === onlineIndex) selected = idx;
+  gameCanvas.addEventListener('click', e=>{ const pos = screenToWorld(e.clientX, e.clientY); const idx = cellAt(pos.x, pos.y); if(idx == null) return; const cell = grid[idx]; const isOnlineNow = window.isInRoom; if(selected === null){ // select only if player owns it (offline owner=0, online owner === my index)
+      const myIndex = (window.socketClient && window.socketClient.getPlayerIndex) ? window.socketClient.getPlayerIndex() : 0;
+      if(isOnlineNow){
+        if(cell.owner === myIndex) selected = idx;
       } else {
-        if(cell.owner === 0) selected = idx; // offline default: player 0
+        if(cell.owner === 0) selected = idx;
       }
     } else {
       if(idx !== selected && isNeighbor(selected, idx)){
         const ratio = ratioSlider ? parseInt(ratioSlider.value,10)/100 : 0.5;
-        // If online, send action to server; otherwise do local move
-        if(window.socketClient && typeof window.socketClient.sendAction === 'function' && window.socketClient.getRoomId && window.socketClient.getRoomId()){
-          window.socketClient.sendAction({ type:'move', from: selected, to: idx, ratio });
+        if(window.isInRoom && window.socketClient){
+          // optimistic local update for smoothness
+          try{
+            moveTroops(selected, idx, ratio);
+            // send action to server
+            window.socketClient.sendAction({ type:'move', from:selected, to:idx, ratio });
+          }catch(e){ console.warn('online move failed', e); }
         } else {
           moveTroops(selected, idx, ratio);
         }
       }
       selected = null;
-    }
-    needRender = true;
-  });
+    } needRender = true; });
 
   function startGame(){ try{ if(!grid || grid.length < 8) buildGrid(); const cnt = playerCount ? Math.max(2, Math.min(4, parseInt(playerCount.value,10) || 4)) : 4; setupPlayers(cnt); seedCapitals(); startProduction(prodRate ? parseInt(prodRate.value,10) : 900); if(botTimer) clearInterval(botTimer); botTimer = setInterval(botTick, 900); document.getElementById('lobby').style.display = 'none'; updateLegend(); needRender = true; }catch(err){ console.error(err); dbg.style.display='block'; dbg.textContent = String(err); } }
   window.startGame = startGame; if(startBtn) startBtn.addEventListener('click', startGame);
 
-  // animation frame
   let last = performance.now(); function frame(now){ const dt = now - last; last = now; try{ updateEffectsAndAnimations(dt); if(needRender || animations.length>0 || effects.length>0){ render(); } }catch(e){ console.error(e); dbg.style.display='block'; dbg.textContent = String(e); } requestAnimationFrame(frame); } requestAnimationFrame(frame);
 
-  // initial offline build
   buildGrid(); setupPlayers(4); seedCapitals(); updateLegend(); needRender = true;
 
 });
@@ -348,10 +427,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
   <pre id="consoleLog" style="white-space:pre-wrap;font-size:12px;margin:0;height:60vh;overflow:auto"></pre>
 </div>
 
+
 <script src="socket-client.js"></script>
 <script>
-// small helpers and online wiring
-
+// Debug logger helper used by socket client and page
 window.debugLogs = [];
 function debugLog(msg){
   try{
@@ -366,11 +445,20 @@ function debugLog(msg){
     console.log('DEBUG:', msg);
   }catch(e){ console.log('debugLog failed', e); }
 }
-document.addEventListener('keydown', function(e){ if(e.key && e.key.toLowerCase() === 'm'){ toggleConsole(); }});
+
+// Toggle debug console with M and button
+document.addEventListener('keydown', function(e){
+  if(e.key && e.key.toLowerCase() === 'm'){ toggleConsole(); }
+});
 document.getElementById('debugToggle').addEventListener('click', toggleConsole);
 document.getElementById('closeConsole').addEventListener('click', toggleConsole);
-function toggleConsole(){ const el = document.getElementById('debugConsole'); if(!el) return; el.style.display = (el.style.display === 'none' ? 'block' : 'none'); }
+function toggleConsole(){
+  const el = document.getElementById('debugConsole');
+  if(!el) return;
+  el.style.display = (el.style.display === 'none' ? 'block' : 'none');
+}
 
+// Online page wiring
 const onlineBtnLocal = document.getElementById('onlineBtnLocal');
 const onlinePage = document.getElementById('onlinePage');
 const onlineBack = document.getElementById('onlineBack');
@@ -387,6 +475,7 @@ const leaveRoomBtn = document.getElementById('leaveRoomBtn');
 onlineBtnLocal && onlineBtnLocal.addEventListener('click', ()=>{ onlinePage.style.display='block'; document.getElementById('lobby').style.display='none'; });
 onlineBack && onlineBack.addEventListener('click', ()=>{ onlinePage.style.display='none'; document.getElementById('lobby').style.display='flex'; });
 
+// socketClient assumed to be loaded via socket-client.js
 createRoomBtn && createRoomBtn.addEventListener('click', ()=>{
   const name = roomNameInput.value || null;
   const maxPlayers = parseInt(roomMaxSelect.value,10) || 4;
@@ -395,6 +484,7 @@ createRoomBtn && createRoomBtn.addEventListener('click', ()=>{
     window.socketClient.createRoom({name, maxPlayers});
   } else debugLog('socketClient not ready');
 });
+
 joinRoomBtn && joinRoomBtn.addEventListener('click', ()=>{
   const code = joinCodeInput.value.trim();
   if(!code) return alert('ادخل رمز الغرفة');
@@ -403,29 +493,43 @@ joinRoomBtn && joinRoomBtn.addEventListener('click', ()=>{
     window.socketClient.joinRoom({roomId: code});
   } else debugLog('socketClient not ready');
 });
+
 startRoomBtn && startRoomBtn.addEventListener('click', ()=>{
   if(window.socketClient && window.socketClient.startGame){
     window.socketClient.startGame({prodRate: parseInt(document.getElementById('prodRate').value,10) || 900});
   } else debugLog('startGame not available');
 });
+
 leaveRoomBtn && leaveRoomBtn.addEventListener('click', ()=>{
   if(window.socketClient && window.socketClient.leaveRoom){
     window.socketClient.leaveRoom();
-    // reset UI
-    document.getElementById('onlinePage').style.display='none';
-    document.getElementById('lobby').style.display='flex';
-    document.getElementById('roomInfo').textContent = '';
+    window.isInRoom = false;
     leaveRoomBtn.style.display = 'none';
+    roomInfo.textContent = '';
+    playerList.innerHTML = '';
+    document.getElementById('lobby').style.display = 'flex';
+    onlinePage.style.display = 'none';
   }
 });
 
-window.updateRoomPlayers = function(playersArr){
+// helper to update player list UI from server state
+window.updateRoomPlayers = function(players){ 
   if(!playerList) return;
   playerList.innerHTML = '';
-  (playersArr||[]).forEach(p=>{
+  players.forEach(p=>{
     const li = document.createElement('li');
-    li.textContent = (p.name || ('P'+(p.index+1))) + (p.isHost? ' (Host)':'');
-    li.style.color = p.color || '#fff';
+    li.textContent = (p.name || ('P'+(p.index+1))) + (p.isHost? ' (Host)':''); 
+    // show color swatch if available
+    if(p.color){
+      const sw = document.createElement('span');
+      sw.style.display='inline-block';
+      sw.style.width='12px';
+      sw.style.height='10px';
+      sw.style.background = p.color;
+      sw.style.marginLeft='8px';
+      sw.style.borderRadius='4px';
+      li.appendChild(sw);
+    }
     playerList.appendChild(li);
   });
 };
@@ -435,42 +539,7 @@ window._debugLog = debugLog;
 </script>
 
 <script>
-/* START: Online helpers (applyState/startOnlineGame) */
-window.startOnlineGame=function(state){
-    try{
-      if(!state) return;
-      // adopt server grid + players
-      window.grid = state.grid || window.grid || [];
-      // map players to local players array needed by render loop
-      if(Array.isArray(state.players)){
-        // build players[] with id = index, color from server
-        window.players = state.players.map(p=>{
-          return { id:p.index, index:p.index, name:p.name || ('P'+(p.index+1)), capital:p.capital, alive:p.alive, color:p.color || '#999' };
-        });
-      }
-      // stop local bots/production
-      if(window.botTimer){ clearInterval(window.botTimer); window.botTimer = null; }
-      if(window.prodTimer){ clearInterval(window.prodTimer); window.prodTimer = null; }
-      // hide UI
-      const lobby = document.getElementById('lobby'); if(lobby) lobby.style.display='none';
-      const onlinePage = document.getElementById('onlinePage'); if(onlinePage) { onlinePage.style.display='none'; document.getElementById('leaveRoomBtn').style.display = 'inline-block'; }
-      const gameCanvas = document.getElementById('game'); if(gameCanvas) gameCanvas.style.display = 'block';
-      // center camera on this player's capital if available
-      try{
-        const meIndex = window.socketClient && window.socketClient.getPlayerIndex ? window.socketClient.getPlayerIndex() : null;
-        const me = (state.players||[]).find(p=>p.index === meIndex);
-        if(me && typeof me.capital !== 'undefined' && window.grid && window.grid[me.capital]){
-          const cap = window.grid[me.capital];
-          if(window.cam) { window.cam.x = -cap.x; window.cam.y = -cap.y; window.cam.scale = Math.max(0.9, 1.0); }
-        }
-      }catch(e){ console.warn('startOnlineGame camera set failed', e); }
-      if(typeof window.needRender !== 'undefined') window.needRender = true;
-      if(typeof updateLegend === 'function') updateLegend();
-    }catch(e){
-      console.error('startOnlineGame error', e);
-    }
-};
-
+/* applyState and online helpers: these will be called by socket-client.js when state arrives */
 window.applyState = function(state){
   try{
     if(!state) return;
@@ -478,29 +547,78 @@ window.applyState = function(state){
       window.grid = state.grid;
     }
     if(state.players && Array.isArray(state.players)){
-      // replace players local array
-      window.players = state.players.map(p=>({ id:p.index, index:p.index, name:p.name, capital:p.capital, alive:p.alive, color:p.color }));
+      // server provides canonical players array (including color)
+      window.players = state.players.map(p=>{
+        // ensure defaults
+        return {
+          id: p.index,
+          index: p.index,
+          name: p.name || ('P'+(p.index+1)),
+          color: p.color || '#999999',
+          capital: (typeof p.capital!=='undefined') ? p.capital : null,
+          alive: (typeof p.alive!=='undefined') ? Boolean(p.alive) : true,
+          isHost: !!p.isHost
+        };
+      });
     }
-    // sync UI lists
-    if(typeof updateLegend === 'function') updateLegend();
-    if(typeof window.updateRoomPlayers === 'function') try{ window.updateRoomPlayers(window.players); }catch(e){}
+
+    // update local UI
+    if(typeof updateLegend === 'function') try{ updateLegend(); }catch(e){}
+    if(typeof window.updateRoomPlayers === 'function'){
+      try{ window.updateRoomPlayers(window.players.map(p=>({index:p.index,name:p.name,isHost:p.isHost,color:p.color,capital:p.capital,alive:p.alive}))); }catch(e){}
+    }
+
+    // render quickly
     if(typeof window.needRender !== 'undefined') window.needRender = true;
   }catch(e){
     console.error('applyState error', e);
   }
 };
 
-// handle server game_over
-window.onGameOver = function(d){
-  if(!d) return;
-  const winnerName = d.winnerName || ('P'+(d.winnerIndex+1));
-  document.getElementById('victoryText').textContent = 'الفائز هو:';
-  document.getElementById('victorName').textContent = winnerName;
-  document.getElementById('victoryOverlay').style.display = 'flex';
-  // stop local timers
-  if(window.prodTimer) clearInterval(window.prodTimer);
-  if(window.botTimer) clearInterval(window.botTimer);
+window.startOnlineGame = function(state){
+  try{
+    if(!state) return;
+    window.isOnline = true;
+    window.isInRoom = true;
+    // adopt server grid + players
+    if(state.grid) window.grid = state.grid;
+    if(state.players) {
+      window.players = state.players.map(p=>({
+        id: p.index, index: p.index, name: p.name || ('P'+(p.index+1)), color:p.color || '#999', capital:p.capital||null, alive:!!p.alive, isHost:!!p.isHost
+      }));
+    }
+    // stop local bots and production
+    if(window.botTimer) { clearInterval(window.botTimer); window.botTimer = null; }
+    if(window.prodTimer) { clearInterval(window.prodTimer); window.prodTimer = null; }
+
+    // show leave button
+    const leaveBtn = document.getElementById('leaveRoomBtn');
+    if(leaveBtn) leaveBtn.style.display = 'inline-block';
+
+    // hide lobby, show game
+    const lobby = document.getElementById('lobby');
+    if(lobby) lobby.style.display = 'none';
+    const onlinePage = document.getElementById('onlinePage');
+    if(onlinePage) onlinePage.style.display = 'none';
+    const gameCanvas = document.getElementById('game');
+    if(gameCanvas) gameCanvas.style.display = 'block';
+
+    // set camera to this player's capital if we know index
+    try{
+      const meIndex = window.socketClient && window.socketClient.getPlayerIndex ? window.socketClient.getPlayerIndex() : null;
+      const me = (window.players||[]).find(p=>p.index===meIndex);
+      if(me && typeof me.capital === 'number' && window.grid && window.grid[me.capital]){
+        const cap = window.grid[me.capital];
+        if(window.cam){ window.cam.x = -cap.x; window.cam.y = -cap.y; window.cam.scale = Math.max(0.9,1.0); }
+      }
+    }catch(e){ console.warn('camera set failed', e); }
+
+    if(typeof window.needRender !== 'undefined') window.needRender = true;
+  }catch(e){
+    console.error('startOnlineGame error', e);
+  }
 };
 </script>
+
 </body>
 </html>
