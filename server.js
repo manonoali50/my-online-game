@@ -10,7 +10,7 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server, path: '/ws' });
 
 const HEX = 34;
-const colorPool = ['#3399ff','#ff5555','#ffe047','#8a60ff','#00c48c','#ff8800','#33ffaa','#aa33ff','#ff33aa'];
+const colorPool = ['#ff5555','#3399ff','#00c48c','#ffe047'];
 
 function buildGridForServer(cols = 10, rows = 8){
   const grid = [];
