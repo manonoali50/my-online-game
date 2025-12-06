@@ -142,6 +142,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   var players = [];
   var cam = { x:0, y:0, scale:1 };
+  // expose cam so external code (server/client) can center camera on capital
+  window.cam = cam;
   var selected = null;
   var animations = [];
   var effects = [];
@@ -195,12 +197,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   function setupPlayers(n){
     players = [];
-    const usedColors = new Set();
-    const colorPool = ['#3399ff','#ff5555','#ffe047','#8a60ff','#00c48c','#ff8800','#33ffaa','#aa33ff','#ff33aa'];
+    // fixed 4-color pool (red, blue, green, yellow)
+    const colorPool = ['#ff5555','#3399ff','#00c48c','#ffe047'];
     for(let i=0;i<n;i++){
-      let color;
-      do { color = colorPool[Math.floor(Math.random() * colorPool.length)]; } while(usedColors.has(color));
-      usedColors.add(color);
+      // assign colors in order, reuse if n>4
+      const color = colorPool[i % colorPool.length];
       players.push({ id:i, color:color, name:'P'+(i+1), capital:null, alive:true });
     }
     updateLegend();
