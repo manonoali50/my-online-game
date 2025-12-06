@@ -484,5 +484,103 @@ needRender=true;
 };
 </script>
 
+
+<!-- START: Online integration helpers added by assistant -->
+<script>
+/*
+  startOnlineGame(state)
+  - state: { grid, players }
+  This function will initialize the client-side view to the online state,
+  hide lobby/online UI, stop bots, set camera on player's capital, and render.
+*/
+window.startOnlineGame = function(state){
+  try{
+    if(!state) return;
+    // adopt server grid + players
+    window.grid = state.grid || window.grid || [];
+    window.players = state.players || window.players || [];
+
+    // mark isMe based on socketClient info if available
+    try{
+      const meIndex = window.socketClient && window.socketClient.getPlayerIndex ? window.socketClient.getPlayerIndex() : null;
+      if(Array.isArray(window.players) && typeof meIndex === 'number'){
+        for(const p of window.players) p.isMe = (p.index === meIndex);
+      }
+    }catch(e){ /* ignore */ }
+
+    // stop any local bots/production (server will control production)
+    if(window.botTimer) { clearInterval(window.botTimer); window.botTimer = null; }
+    if(window.prodTimer) { clearInterval(window.prodTimer); window.prodTimer = null; }
+
+    // ensure lobby/online page hidden
+    const lobby = document.getElementById('lobby');
+    if(lobby) lobby.style.display = 'none';
+    const onlinePage = document.getElementById('onlinePage');
+    if(onlinePage) onlinePage.style.display = 'none';
+    const gameCanvas = document.getElementById('game');
+    if(gameCanvas) gameCanvas.style.display = 'block';
+
+    // center camera on this player's capital if available
+    try{
+      const me = (window.players||[]).find(p=>p.isMe || p.socketId===window.socketId);
+      if(me && typeof me.capital !== 'undefined' && window.grid && window.grid[me.capital]){
+        const cap = window.grid[me.capital];
+        if(window.cam) {
+          window.cam.x = -cap.x;
+          window.cam.y = -cap.y;
+          window.cam.scale = Math.max(0.9, 1.0);
+        }
+      }
+    }catch(e){ console.warn('startOnlineGame camera set failed', e); }
+
+    // request a render
+    if(typeof window.needRender !== 'undefined') window.needRender = true;
+    // also apply the state to update visuals
+    if(window.applyState) window.applyState({grid: window.grid, players: window.players});
+  }catch(e){
+    console.error('startOnlineGame error', e);
+  }
+};
+
+/*
+  applyState(state)
+  - Updates client-side grid & players arrays and refreshes visuals.
+  This is called whenever the server broadcasts a state.
+*/
+window.applyState = function(state){
+  try{
+    if(!state) return;
+    if(state.grid && Array.isArray(state.grid)){
+      // copy fields into local grid array to preserve references used by rendering
+      window.grid = state.grid;
+    }
+    if(state.players && Array.isArray(state.players)){
+      window.players = state.players;
+    }
+
+    // ensure numbers are valid (prevent "ture" typo)
+    if(Array.isArray(window.players)){
+      for(const p of window.players){
+        if(typeof p.alive !== 'boolean'){
+          p.alive = Boolean(p.alive === 'true' || p.alive === true);
+        }
+      }
+    }
+
+    // sync any UI elements, like legend or player list
+    if(typeof updateLegend === 'function') try{ updateLegend(); }catch(e){}
+    if(typeof window.updateRoomPlayers === 'function'){
+      try{ window.updateRoomPlayers(window.players); }catch(e){}
+    }
+
+    // trigger a render
+    if(typeof window.needRender !== 'undefined') window.needRender = true;
+  }catch(e){
+    console.error('applyState error', e);
+  }
+};
+</script>
+<!-- END: Online integration helpers added by assistant -->
+
 </body>
 </html>
