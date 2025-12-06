@@ -136,7 +136,12 @@ function handleMessage(ws, msg){
     const room = rooms[d.roomId];
     if(!room) { ws.send(JSON.stringify({t:'error', d:{message:'الغرفة غير موجودة'}})); return; }
     if(d.grid && Array.isArray(d.grid) && d.grid.length>0){
+      // Accept host-provided grid so online matches offline exactly
       room.grid = d.grid;
+      // Recompute neighbors (in case)
+      for(let i=0;i<room.grid.length;i++){
+        room.grid[i].neighbors = room.grid[i].neighbors || [];
+      }
     }
     if(d.players && Array.isArray(d.players)){
       for(const pd of d.players){
@@ -181,6 +186,7 @@ function handleMessage(ws, msg){
     const action = d.action;
     if(action.type==='move'){
       moveTroopsServer(room.grid, room.players, action.from, action.to, action.ratio);
+      // broadcast updated authoritative state to all players
       broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),capital:p.capital,alive:p.alive})) } } });
     }
   }
