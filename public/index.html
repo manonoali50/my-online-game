@@ -1,4 +1,4 @@
-!doctype html>
+<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8" />
@@ -413,7 +413,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   function startGame(){ try{ if(!grid || grid.length < 8) buildGrid(); const cnt = playerCount ? Math.max(2, Math.min(4, parseInt(playerCount.value,10) || 4)) : 4; setupPlayers(cnt); seedCapitals(); startProduction(prodRate ? parseInt(prodRate.value,10) : 900); if(botTimer) clearInterval(botTimer); botTimer = setInterval(botTick, 900); document.getElementById('lobby').style.display = 'none'; updateLegend(); needRender = true; }catch(err){ console.error(err); dbg.style.display='block'; dbg.textContent = String(err); } }
   window.startGame = startGame; if(startBtn) startBtn.addEventListener('click', startGame);
 
-  let last = performance.now(); function frame(now){ const dt = now - last; last = now; try{ updateEffectsAndAnimations(dt); if(needRender || animations.length>0 || effects.length>0){ render(); } }catch(e){ console.error(e); dbg.style.display='block'; dbg.textContent = String(e); } requestAnimationFrame(frame); } requestAnimationFrame(frame);
+  let last = performance.now(); function frame(now){ const dt = now - last; last = now; try{ updateEffectsAndAnimations(dt); render(); }catch(e){ console.error(e); dbg.style.display='block'; dbg.textContent = String(e); } requestAnimationFrame(frame); } requestAnimationFrame(frame);
 
   buildGrid(); setupPlayers(4); seedCapitals(); updateLegend(); needRender = true;
 
@@ -569,12 +569,22 @@ window.applyState = function(state){
     }
 
     // render quickly
-    if(typeof window.needRender !== 'undefined') window.needRender = true;
+    try{
+  if(window.isInRoom && !window._centeredOnStart){
+    const me = (window.players||[]).find(p=>p.index===window.socketClient.getPlayerIndex());
+    if(me && typeof me.capital==='number'){
+      const cap=window.grid[me.capital]; if(window.cam){ window.cam.x=-cap.x; window.cam.y=-cap.y; }
+      window._centeredOnStart=true;
+    }
+  }
+}catch(e){console.warn('auto-center',e);}
+if(typeof window.needRender !== 'undefined') window.needRender = true;
   }catch(e){
     console.error('applyState error', e);
   }
 };
 
+window._centeredOnStart=false;
 window.startOnlineGame = function(state){
   try{
     if(!state) return;
@@ -613,7 +623,16 @@ window.startOnlineGame = function(state){
       }
     }catch(e){ console.warn('camera set failed', e); }
 
-    if(typeof window.needRender !== 'undefined') window.needRender = true;
+    try{
+  if(window.isInRoom && !window._centeredOnStart){
+    const me = (window.players||[]).find(p=>p.index===window.socketClient.getPlayerIndex());
+    if(me && typeof me.capital==='number'){
+      const cap=window.grid[me.capital]; if(window.cam){ window.cam.x=-cap.x; window.cam.y=-cap.y; }
+      window._centeredOnStart=true;
+    }
+  }
+}catch(e){console.warn('auto-center',e);}
+if(typeof window.needRender !== 'undefined') window.needRender = true;
   }catch(e){
     console.error('startOnlineGame error', e);
   }
