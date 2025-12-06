@@ -27,11 +27,13 @@
     window._debugLog && window._debugLog({t,d});
     if(t==='room_created'){
       roomId = d.roomId; playerIndex = d.playerIndex; isHost = true;
+      window.onlineMode = true;
       alert('تم إنشاء الغرفة: ' + roomId + '\nانت المضيف.');
       window.updateRoomPlayers && window.updateRoomPlayers(d.players || []);
       document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + roomId;
     } else if(t==='joined'){
       roomId = d.roomId; playerIndex = d.playerIndex; isHost = d.isHost;
+      window.onlineMode = true;
       alert('انضممت للغرفة: ' + roomId + (isHost? ' (مضيف)':''));
       window.updateRoomPlayers && window.updateRoomPlayers(d.players || []);
       document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + roomId;
@@ -55,11 +57,13 @@
   window.socketClient = {
     createRoom(opts){ send('create_room', opts || {}); },
     joinRoom(opts){ send('join_room', opts || {}); },
-    leaveRoom(){ send('leave_room', {roomId}); roomId=null; playerIndex=null; isHost=false; },
+    leaveRoom(){ send('leave_room', {roomId}); roomId=null; playerIndex=null; isHost=false; window.onlineMode=false; },
     sendAction(action){ send('action', { action, roomId }); },
     startGame(opts){ 
       if(isHost && window.grid && window.grid.length){
-        send('host_grid', { roomId, grid: window.grid, players: (window.players || []).map(p=>({ index: p.index, capital: p.capital, name: p.name })) });
+        // send host's grid + players so server can use exact same map & capitals
+        send('host_grid', { roomId, grid: window.grid, players: (window.players || []).map(p=>({ index: p.id || p.index, capital: p.capital, name: p.name })) });
+        // small delay to ensure server processed host_grid
         setTimeout(()=> send('start_game', { roomId, prodRate: (opts && opts.prodRate) || 900 }), 150);
       } else {
         send('start_game', { roomId, prodRate: (opts && opts.prodRate) || 900 });
