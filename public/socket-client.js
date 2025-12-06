@@ -1,4 +1,3 @@
-// public/socket-client.js (مُحدَّث)
 (function(){
   const proto = (location.protocol === 'https:' ? 'wss://' : 'ws://');
   const host = location.host;
@@ -28,14 +27,20 @@
     window._debugLog && window._debugLog({t,d});
     if(t==='room_created'){
       roomId = d.roomId; playerIndex = d.playerIndex; isHost = true;
+      window.isInRoom = true;
       alert('تم إنشاء الغرفة: ' + roomId + '\nانت المضيف.');
       window.updateRoomPlayers && window.updateRoomPlayers(d.players || []);
       document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + roomId;
+      const leaveBtn = document.getElementById('leaveRoomBtn');
+      if(leaveBtn) leaveBtn.style.display = 'inline-block';
     } else if(t==='joined'){
       roomId = d.roomId; playerIndex = d.playerIndex; isHost = d.isHost;
+      window.isInRoom = true;
       alert('انضممت للغرفة: ' + roomId + (isHost? ' (مضيف)':''));
       window.updateRoomPlayers && window.updateRoomPlayers(d.players || []);
       document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + roomId;
+      const leaveBtn = document.getElementById('leaveRoomBtn');
+      if(leaveBtn) leaveBtn.style.display = 'inline-block';
     } else if(t==='player_joined' || t==='player_left' || t==='host_changed'){
       window._debugLog('room event: ' + t);
       if(d && d.players) window.updateRoomPlayers(d.players);
@@ -44,39 +49,41 @@
         if(waitingForStart){ waitingForStart = false; window._debugLog && window._debugLog('Starting online game from state'); if(window.startOnlineGame){ window.startOnlineGame(d.state); } }
         window.applyState && window.applyState(d.state);
         document.getElementById('roomInfo') && (document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + (roomId||'—'));
-        if(d.state && d.state.players) window.updateRoomPlayers && window.updateRoomPlayers(d.state.players);
+        if(d.players) window.updateRoomPlayers(d.players);
       }
     } else if(t==='error'){
       alert('خطأ: ' + (d && d.message));
     } else if(t==='game_started'){ waitingForStart = true; window._debugLog && window._debugLog('game_started received'); } else if(t==='host_grid_received'){
       window._debugLog && window._debugLog('host grid received by server');
     } else if(t==='game_over'){
-      // show victory overlay
-      if(window.onGameOver){
-        window.onGameOver(d);
-      } else {
-        alert('انتهت اللعبة. الفائز: ' + (d && d.winnerName));
-      }
+      // server declared game over
+      try{
+        const winner = d && d.winner;
+        if(winner != null){
+          if(window.applyState) window.applyState(d.state || {});
+          if(window.victoryOverlay) {
+            document.getElementById('victoryText').textContent = 'الفائز هو:';
+            document.getElementById('victorName').textContent = (d.winnerName || ('P'+(winner+1)));
+            document.getElementById('victoryOverlay').style.display = 'flex';
+          }
+        }
+      }catch(e){ console.warn('game_over handling failed', e); }
     }
   }
 
   window.socketClient = {
     createRoom(opts){ send('create_room', opts || {}); },
     joinRoom(opts){ send('join_room', opts || {}); },
-    leaveRoom(){ if(roomId){ send('leave_room', {roomId}); } roomId=null; playerIndex=null; isHost=false; },
+    leaveRoom(){ send('leave_room', {roomId}); roomId=null; playerIndex=null; isHost=false; window.isInRoom=false; const leaveBtn = document.getElementById('leaveRoomBtn'); if(leaveBtn) leaveBtn.style.display='none'; },
     sendAction(action){ send('action', { action, roomId }); },
     startGame(opts){ 
       if(isHost && window.grid && window.grid.length){
-        // send host grid (so server uses exact same map)
         send('host_grid', { roomId, grid: window.grid, players: (window.players || []).map(p=>({ index: p.index, capital: p.capital, name: p.name })) });
         setTimeout(()=> send('start_game', { roomId, prodRate: (opts && opts.prodRate) || 900 }), 150);
       } else {
         send('start_game', { roomId, prodRate: (opts && opts.prodRate) || 900 });
       }
     },
-    getPlayerIndex(){ return playerIndex; },
-    getRoomId(){ return roomId; },
-    isHost(){ return isHost; },
-    getSocket(){ return ws; }
+    getPlayerIndex(){ return playerIndex; }
   };
 })();
