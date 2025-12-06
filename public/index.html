@@ -194,7 +194,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   function isNeighbor(a,b){ if(!grid||!grid[a]||!grid[b]) return false; return Math.hypot(grid[a].x-grid[b].x, grid[a].y-grid[b].y) < HEX * 1.8; }
 
   function setupPlayers(n){
-    players = [];
+    players = []; // will use server-provided colors in online mode
     const usedColors = new Set();
     const colorPool = ['#3399ff','#ff5555','#ffe047','#8a60ff','#00c48c','#ff8800','#33ffaa','#aa33ff','#ff33aa'];
     for(let i=0;i<n;i++){
@@ -413,19 +413,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
   function startGame(){ try{ if(!grid || grid.length < 8) buildGrid(); const cnt = playerCount ? Math.max(2, Math.min(4, parseInt(playerCount.value,10) || 4)) : 4; setupPlayers(cnt); seedCapitals(); startProduction(prodRate ? parseInt(prodRate.value,10) : 900); if(botTimer) clearInterval(botTimer); botTimer = setInterval(botTick, 900); document.getElementById('lobby').style.display = 'none'; updateLegend(); needRender = true; }catch(err){ console.error(err); dbg.style.display='block'; dbg.textContent = String(err); } }
   window.startGame = startGame; if(startBtn) startBtn.addEventListener('click', startGame);
 
-  let last = performance.now(); function frame(now){
-    requestAnimationFrame(frame);
-    const dt = now - last;
-    last = now;
-    try{
-      updateEffectsAndAnimations(dt);
-      // always render every frame so client shows server updates even without user input
-      render();
-    }catch(e){
-      console.error(e); dbg.style.display='block'; dbg.textContent = String(e);
+  let last = performance.now(); 
+function frame(now){
+  // continuous render loop — always update and render so client shows server changes without input
+  try{ requestAnimationFrame(frame); }catch(e){ /* ignore */ }
+  try{
+    const dt = (window._lastFrameTime ? (now - window._lastFrameTime) : 16);
+    window._lastFrameTime = now;
+    // update animations/effects with dt (ms)
+    if(typeof updateEffectsAndAnimations === 'function'){
+      try{ updateEffectsAndAnimations(dt); }catch(e){ console.warn('updateEffectsAndAnimations failed', e); }
     }
-  }
-  requestAnimationFrame(frame); requestAnimationFrame(frame);
+    // always render every frame so client stays in sync with server state
+    if(typeof render === 'function'){
+      try{ render(); }catch(e){ console.warn('render failed', e); }
+    }
+  }catch(e){ console.warn('frame loop caught', e); }
+}
+requestAnimationFrame(frame);
+ } requestAnimationFrame(frame);
 
   buildGrid(); setupPlayers(4); seedCapitals(); updateLegend(); needRender = true;
 
@@ -575,7 +581,27 @@ window.applyState = function(state){
     }
 
     // update local UI
-    if(typeof updateLegend === 'function') try{ updateLegend(); }catch(e){}
+    if(typeof updateLegend === 'function') try{ updateLegend(); }catch
+  // auto-center camera on this player's capital once when first state arrives (do not change zoom)
+  try{
+    if(window.isInRoom && !window._centeredOnStart){
+      var meIndex = null;
+      try{ meIndex = (window.socketClient && window.socketClient.getPlayerIndex) ? window.socketClient.getPlayerIndex() : null; }catch(e){ meIndex = null; }
+      if(meIndex === null && window.players && window.players.length > 0){
+        // try to find a player object flagged as 'isHost' or with name 'P1' as fallback
+        for(var ii=0; ii<window.players.length; ii++){ if(window.players[ii].isHost){ meIndex = window.players[ii].index; break; } }
+      }
+      if(meIndex !== null){
+        var me = (window.players||[]).find(function(pp){ return pp.index === meIndex; });
+        if(me && typeof me.capital === 'number' && window.grid && window.grid[me.capital]){
+          var cap = window.grid[me.capital];
+          if(window.cam){ window.cam.x = -cap.x; window.cam.y = -cap.y; }
+          window._centeredOnStart = true;
+        }
+      }
+    }
+  }catch(err){ console.warn('auto-center failed', err); }
+(e){}
     if(typeof window.updateRoomPlayers === 'function'){
       try{ window.updateRoomPlayers(window.players.map(p=>({index:p.index,name:p.name,isHost:p.isHost,color:p.color,capital:p.capital,alive:p.alive}))); }catch(e){}
     }
@@ -590,20 +616,6 @@ window.applyState = function(state){
     }
   }
 }catch(e){console.warn('auto-center',e);}
-
-    // auto-center camera on this player's capital once when first state arrives (keep zoom)
-    try{
-      if(window.isInRoom && !window._centeredOnStart){
-        const meIndex = window.socketClient && window.socketClient.getPlayerIndex ? window.socketClient.getPlayerIndex() : null;
-        const me = (window.players||[]).find(p=>p.index===meIndex);
-        if(me && typeof me.capital === 'number' && window.grid && window.grid[me.capital]){
-          const cap = window.grid[me.capital];
-          if(window.cam){ window.cam.x = -cap.x; window.cam.y = -cap.y; }
-          window._centeredOnStart = true;
-        }
-      }
-    }catch(e){ console.warn('auto-center failed', e); }
-
 if(typeof window.needRender !== 'undefined') window.needRender = true;
   }catch(e){
     console.error('applyState error', e);
@@ -611,7 +623,7 @@ if(typeof window.needRender !== 'undefined') window.needRender = true;
 };
 
 window._centeredOnStart=false;
-window.startOnlineGame = function(state){ window._centeredOnStart = false;
+window.startOnlineGame = function(state){
   try{
     if(!state) return;
     window.isOnline = true;
