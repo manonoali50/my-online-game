@@ -1,3 +1,4 @@
+// server.js (مُحدَّث)
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
@@ -68,6 +69,7 @@ function moveTroopsServer(grid, playersArr, fromIdx, toIdx, ratio){
         const defPlayer = playersArr.find(p=>p.index === defeatedOwner);
         if(defPlayer && defPlayer.capital === toIdx){
           defPlayer.alive = false;
+          // clear all cells of defeated player
           for(const c of grid){ if(c.owner === defeatedOwner){ c.owner = null; c.troops = 0; } }
         }
       }
@@ -77,7 +79,12 @@ function moveTroopsServer(grid, playersArr, fromIdx, toIdx, ratio){
   }
 }
 
+// rooms: id -> { id, players: [{ ws, index, name, alive, capital, color, socketId }], host, maxPlayers, grid, prodTimer, running }
 const rooms = {};
+function pickColor(used){
+  for(const c of COLOR_POOL) if(!used.has(c)) return c;
+  return COLOR_POOL[Math.floor(Math.random()*COLOR_POOL.length)];
+}
 
 wss.on('connection', function connection(ws){
   ws.id = uuidv4();
@@ -88,15 +95,17 @@ wss.on('connection', function connection(ws){
     } catch(e){ console.error('invalid msg', e); }
   });
   ws.on('close', ()=>{
+    // remove from any room
     for(const rid in rooms){
       const room = rooms[rid];
       const idx = room.players.findIndex(p=>p.ws === ws);
       if(idx!==-1){
         const left = room.players.splice(idx,1)[0];
-        broadcast(room, { t:'player_left', d:{ index:left.index, players:room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),socketId:p.socketId,color:p.color})) } });
+        // reassign host if needed
         if(room.host === left.index){
           if(room.players.length>0){ room.host = room.players[0].index; broadcast(room,{t:'host_changed', d:{host:room.host}}); }
         }
+        broadcast(room, { t:'player_left', d:{index:left.index, players:room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),color:p.color,socketId:p.socketId}))} });
         if(room.players.length===0){
           if(room.prodTimer) clearInterval(room.prodTimer);
           delete rooms[rid];
@@ -105,12 +114,10 @@ wss.on('connection', function connection(ws){
       }
     }
   });
-  // send a hello with assigned socketId
-  try{ ws.send(JSON.stringify({ t:'hello', d:{ socketId: ws.id } })); }catch(e){}
 });
 
 function handleMessage(ws, msg){
-  const t = msg.t, d = msg.d;
+  const t = msg.t, d = msg.d||{};
   if(t==='create_room'){
     const roomId = Math.random().toString(36).slice(2,8).toUpperCase();
     const maxPlayers = d.maxPlayers || 4;
@@ -118,22 +125,26 @@ function handleMessage(ws, msg){
     const defaultRows = Math.max(6, d.rows || 8);
     const room = { id: roomId, players: [], host: null, maxPlayers, grid: buildGridForServer(defaultCols, defaultRows), prodTimer:null, running:false };
     rooms[roomId] = room;
-    const player = { ws, index: 0, name: d.name || ('P1'), alive:true, capital:null, socketId: ws.id, color: COLOR_POOL[0 % COLOR_POOL.length] };
+    const used = new Set();
+    const color = pickColor(used);
+    const player = { ws, index: 0, name: d.name || ('P1'), alive:true, capital:null, color, socketId: ws.id };
     room.players.push(player); room.host = player.index;
-    ws.send(JSON.stringify({ t:'room_created', d:{ roomId, playerIndex:player.index, isHost:true, socketId: ws.id, players: room.players.map(p=>({index:p.index,name:p.name,isHost:true,socketId:p.socketId,color:p.color})) } }));
+    ws.send(JSON.stringify({ t:'room_created', d:{ roomId, playerIndex:player.index, isHost:true, players: room.players.map(p=>({index:p.index,name:p.name,isHost:true,color:p.color,socketId:p.socketId})) } }));
   } else if(t==='join_room'){
     const room = rooms[d.roomId];
     if(!room){ ws.send(JSON.stringify({t:'error', d:{message:'الغرفة غير موجودة'}})); return; }
     if(room.players.length >= room.maxPlayers){ ws.send(JSON.stringify({t:'error', d:{message:'الغرفة ممتلئة'}})); return; }
     const idx = room.players.length;
-    const player = { ws, index: idx, name: 'P'+(idx+1), alive:true, capital:null, socketId: ws.id, color: COLOR_POOL[idx % COLOR_POOL.length] };
+    const used = new Set(room.players.map(p=>p.color));
+    const color = pickColor(used);
+    const player = { ws, index: idx, name: 'P'+(idx+1), alive:true, capital:null, color, socketId: ws.id };
     room.players.push(player);
-    ws.send(JSON.stringify({ t:'joined', d:{ roomId: room.id, playerIndex: player.index, isHost: room.host===player.index, socketId: ws.id, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),socketId:p.socketId,color:p.color})) } }));
-    broadcast(room, { t:'player_joined', d:{ index: player.index, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),socketId:p.socketId,color:p.color})) } });
+    ws.send(JSON.stringify({ t:'joined', d:{ roomId: room.id, playerIndex: player.index, isHost: room.host===player.index, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),color:p.color,socketId:p.socketId})) } }));
+    broadcast(room, { t:'player_joined', d:{ index: player.index, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),color:p.color,socketId:p.socketId})) } });
   } else if(t==='leave_room'){
     const room = rooms[d.roomId]; if(!room) return;
     const i = room.players.findIndex(p=>p.ws===ws);
-    if(i!==-1){ const left = room.players.splice(i,1)[0]; broadcast(room,{t:'player_left', d:{index:left.index, players:room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),socketId:p.socketId,color:p.color}))}}); if(room.host===left.index){ if(room.players.length>0){ room.host = room.players[0].index; broadcast(room,{t:'host_changed', d:{host:room.host}}); } } if(room.players.length===0){ if(room.prodTimer) clearInterval(room.prodTimer); delete rooms[room.id]; } }
+    if(i!==-1){ const left = room.players.splice(i,1)[0]; broadcast(room,{t:'player_left', d:{index:left.index, players:room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),color:p.color,socketId:p.socketId}))}}); if(room.host===left.index){ if(room.players.length>0){ room.host = room.players[0].index; broadcast(room,{t:'host_changed', d:{host:room.host}}); } } if(room.players.length===0){ if(room.prodTimer) clearInterval(room.prodTimer); delete rooms[room.id]; } }
   } else if(t==='host_grid'){
     const room = rooms[d.roomId];
     if(!room) { ws.send(JSON.stringify({t:'error', d:{message:'الغرفة غير موجودة'}})); return; }
@@ -153,10 +164,11 @@ function handleMessage(ws, msg){
   } else if(t==='start_game'){
     const room = rooms[d.roomId]; if(!room) return;
     if(room.running) return;
+    // ensure grid exists; if not build default
     if(!room.grid || room.grid.length===0){
       room.grid = buildGridForServer(Math.max(8,10), Math.max(6,8));
     }
-    const playersArr = room.players.map(p=>({ws:p.ws, index:p.index, capital:p.capital||null, alive:p.alive, socketId:p.socketId, color:p.color}));
+    const playersArr = room.players.map(p=>({ws:p.ws, index:p.index, capital:p.capital||null, alive:p.alive}));
     const anyCapital = playersArr.some(p=>typeof p.capital === 'number' && p.capital !== null);
     if(!anyCapital){
       seedCapitalsForPlayers(room.grid, playersArr);
@@ -171,19 +183,36 @@ function handleMessage(ws, msg){
       }
     }
     room.running = true;
+    // production timer on server
     room.prodTimer = setInterval(()=>{
       for(const c of room.grid){ if(c.owner != null) c.troops++; }
-      broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),capital:p.capital,alive:p.alive,socketId:p.socketId,color:p.color})) } } });
+      broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),capital:p.capital,alive:p.alive,color:p.color,socketId:p.socketId})) } } });
     }, Math.max(50, (d.prodRate||900)));
     broadcast(room, { t:'game_started', d:{} });
-    broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),capital:p.capital,alive:p.alive,socketId:p.socketId,color:p.color})) } } });
+    broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),capital:p.capital,alive:p.alive,color:p.color,socketId:p.socketId})) } } });
   } else if(t==='action'){
     const room = findRoomByWs(ws);
     if(!room) return;
     const action = d.action;
     if(action.type==='move'){
-      moveTroopsServer(room.grid, room.players, action.from, action.to, action.ratio);
-      broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),capital:p.capital,alive:p.alive,socketId:p.socketId,color:p.color})) } } });
+      // validate ownership: only allow move if from.owner === player.index
+      const p = room.players.find(pl=>pl.ws===ws);
+      if(!p) return;
+      const from = action.from, to = action.to, ratio = action.ratio;
+      if(typeof from !== 'number' || typeof to !== 'number') return;
+      if(room.grid[from] && room.grid[from].owner === p.index){
+        moveTroopsServer(room.grid, room.players, from, to, ratio);
+        // after each action, broadcast full state
+        broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),capital:p.capital,alive:p.alive,color:p.color,socketId:p.socketId})) } } });
+        // check victory
+        const alivePlayers = room.players.filter(pl=>pl.alive);
+        if(alivePlayers.length === 1){
+          room.running = false;
+          if(room.prodTimer) { clearInterval(room.prodTimer); room.prodTimer = null; }
+          const winner = alivePlayers[0];
+          broadcast(room, { t:'game_over', d:{ winnerIndex: winner.index, winnerName: winner.name } });
+        }
+      }
     }
   }
 }
