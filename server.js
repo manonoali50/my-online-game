@@ -9,10 +9,11 @@ app.use(express.static('public'));
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server, path: '/ws' });
 
-function buildGrid(W = 10, H = 8, HEX = 34){
+// Re-used HEX/layout constants to match client buildGrid (client uses HEX=34)
+const HEX = 34;
+
+function buildGridForServer(cols = 10, rows = 8){
   const grid = [];
-  const cols = Math.max(8, W);
-  const rows = Math.max(6, H);
   const startX = -cols * HEX * 0.85;
   const startY = -rows * HEX * 0.95;
   for(let r=0;r<rows;r++){
@@ -38,9 +39,8 @@ function seedCapitalsForPlayers(grid, playersArr){
   const cxMin = Math.min(...xs), cxMax = Math.max(...xs);
   const cyMin = Math.min(...ys), cyMax = Math.max(...ys);
   const corners = [[cxMin,cyMin],[cxMax,cyMin],[cxMin,cyMax],[cxMax,cyMax]];
-  const shuffled = corners.sort(()=>Math.random()-0.5);
   for(let p=0;p<playersArr.length;p++){
-    const pt = shuffled[p % shuffled.length];
+    const pt = corners[p % corners.length];
     let bestIdx=0, bestD=Infinity;
     for(let i=0;i<grid.length;i++){
       const d = Math.hypot(grid[i].x - pt[0], grid[i].y - pt[1]);
@@ -98,7 +98,7 @@ wss.on('connection', function connection(ws){
           if(room.players.length>0){ room.host = room.players[0].index; broadcast(room,{t:'host_changed', d:{host:room.host}}); }
         }
         if(room.players.length===0){
-          clearInterval(room.prodTimer);
+          if(room.prodTimer) clearInterval(room.prodTimer);
           delete rooms[rid];
         }
         break;
@@ -112,7 +112,9 @@ function handleMessage(ws, msg){
   if(t==='create_room'){
     const roomId = Math.random().toString(36).slice(2,8).toUpperCase();
     const maxPlayers = d.maxPlayers || 4;
-    const room = { id: roomId, players: [], host: null, maxPlayers, grid: buildGrid(), prodTimer:null, running:false };
+    const defaultCols = Math.max(8, d.cols || 10);
+    const defaultRows = Math.max(6, d.rows || 8);
+    const room = { id: roomId, players: [], host: null, maxPlayers, grid: buildGridForServer(defaultCols, defaultRows), prodTimer:null, running:false };
     rooms[roomId] = room;
     const player = { ws, index: 0, name: d.name || ('P1'), alive:true, capital:null };
     room.players.push(player); room.host = player.index;
@@ -129,15 +131,42 @@ function handleMessage(ws, msg){
   } else if(t==='leave_room'){
     const room = rooms[d.roomId]; if(!room) return;
     const i = room.players.findIndex(p=>p.ws===ws);
-    if(i!==-1){ const left = room.players.splice(i,1)[0]; broadcast(room,{t:'player_left', d:{index:left.index, players:room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index)}))}}); if(room.host===left.index){ if(room.players.length>0){ room.host = room.players[0].index; broadcast(room,{t:'host_changed', d:{host:room.host}}); } } if(room.players.length===0){ clearInterval(room.prodTimer); delete rooms[room.id]; } }
+    if(i!==-1){ const left = room.players.splice(i,1)[0]; broadcast(room,{t:'player_left', d:{index:left.index, players:room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index)}))}}); if(room.host===left.index){ if(room.players.length>0){ room.host = room.players[0].index; broadcast(room,{t:'host_changed', d:{host:room.host}}); } } if(room.players.length===0){ if(room.prodTimer) clearInterval(room.prodTimer); delete rooms[room.id]; } }
+  } else if(t==='host_grid'){
+    const room = rooms[d.roomId];
+    if(!room) { ws.send(JSON.stringify({t:'error', d:{message:'الغرفة غير موجودة'}})); return; }
+    if(d.grid && Array.isArray(d.grid) && d.grid.length>0){
+      room.grid = d.grid;
+    }
+    if(d.players && Array.isArray(d.players)){
+      for(const pd of d.players){
+        const rp = room.players.find(p=>p.index===pd.index);
+        if(rp){
+          rp.capital = (typeof pd.capital !== 'undefined') ? pd.capital : rp.capital;
+          rp.name = pd.name || rp.name;
+        }
+      }
+    }
+    ws.send(JSON.stringify({t:'host_grid_received', d:{ roomId: room.id }}));
   } else if(t==='start_game'){
     const room = rooms[d.roomId]; if(!room) return;
     if(room.running) return;
-    const playersArr = room.players.map(p=>({ws:p.ws, index:p.index, capital:null, alive:true}));
-    seedCapitalsForPlayers(room.grid, playersArr);
-    for(const pa of playersArr){
-      const rp = room.players.find(p=>p.index===pa.index);
-      if(rp) rp.capital = pa.capital;
+    if(!room.grid || room.grid.length===0){
+      room.grid = buildGridForServer(Math.max(8,10), Math.max(6,8));
+    }
+    const playersArr = room.players.map(p=>({ws:p.ws, index:p.index, capital:p.capital||null, alive:p.alive}));
+    const anyCapital = playersArr.some(p=>typeof p.capital === 'number' && p.capital !== null);
+    if(!anyCapital){
+      seedCapitalsForPlayers(room.grid, playersArr);
+      for(const pa of playersArr){
+        const rp = room.players.find(p=>p.index===pa.index);
+        if(rp) rp.capital = pa.capital;
+      }
+    } else {
+      for(const pa of playersArr){
+        const rp = room.players.find(p=>p.index===pa.index);
+        if(rp && typeof pa.capital === 'number') rp.capital = pa.capital;
+      }
     }
     room.running = true;
     room.prodTimer = setInterval(()=>{
