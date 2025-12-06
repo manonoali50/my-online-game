@@ -1,4 +1,4 @@
-<!doctype html>
+!doctype html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8" />
@@ -142,8 +142,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   var players = [];
   var cam = { x:0, y:0, scale:1 };
-  // expose cam so external code (server/client) can center camera on capital
-  window.cam = cam;
   var selected = null;
   var animations = [];
   var effects = [];
@@ -197,11 +195,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   function setupPlayers(n){
     players = [];
-    // fixed 4-color pool (red, blue, green, yellow)
-    const colorPool = ['#ff5555','#3399ff','#00c48c','#ffe047'];
+    const usedColors = new Set();
+    const colorPool = ['#3399ff','#ff5555','#ffe047','#8a60ff','#00c48c','#ff8800','#33ffaa','#aa33ff','#ff33aa'];
     for(let i=0;i<n;i++){
-      // assign colors in order, reuse if n>4
-      const color = colorPool[i % colorPool.length];
+      let color;
+      do { color = colorPool[Math.floor(Math.random() * colorPool.length)]; } while(usedColors.has(color));
+      usedColors.add(color);
       players.push({ id:i, color:color, name:'P'+(i+1), capital:null, alive:true });
     }
     updateLegend();
@@ -368,7 +367,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   function render(){ if(!ctx) return; if(!needRender && animations.length===0 && effects.length===0) return;
     ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,W,H); ctx.fillStyle = '#0d1117'; ctx.fillRect(0,0,W,H); if(!grid||grid.length===0) return;
     for(let i=0;i<grid.length;i++){ const c = grid[i]; const s = worldToScreen(c.x, c.y); drawHex(s.x, s.y, HEX * cam.scale); ctx.fillStyle = c.owner == null ? '#ffffff' : players[c.owner] ? players[c.owner].color : '#fff'; ctx.fill(); if(i === selected){ ctx.strokeStyle = '#00ff00'; ctx.lineWidth = 3; ctx.stroke(); } ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.font = (14 * Math.max(0.7, cam.scale)) + 'px Tahoma'; ctx.fillText(c.troops, s.x, s.y + (5 * cam.scale)); }
-    for(const p of players){ if(p && p.capital != null && p.alive){ drawCapitalMarker(p.capital); } }
+    for(const p of players){ if(p && typeof p.capital !== 'undefined' && p.capital != null && p.alive){ const capIdx = p.capital; const capCell = grid[capIdx]; if(capCell && capCell.owner === p.id){ drawCapitalMarker(p.capital); } } }
     const now = performance.now();
     for(const p of players){ if(!p || p.capital==null || !p.alive) continue; const capIdx = p.capital; const cap = grid[capIdx]; if(!cap) continue; let danger=false; for(let i=0;i<grid.length;i++){ const cell = grid[i]; if(cell.owner != null && cell.owner !== p.id){ const d = Math.hypot(cell.x - cap.x, cell.y - cap.y); if(d < DEFEND_RADIUS){ danger=true; break; } } } if(danger){ const s = worldToScreen(cap.x, cap.y); const blink = 0.5 + 0.5 * Math.sin(now * 0.015); ctx.save(); ctx.translate(s.x, s.y - (HEX * cam.scale + 18 * cam.scale)); ctx.scale(cam.scale, cam.scale); ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(7, 8); ctx.lineTo(-7, 8); ctx.closePath(); ctx.fillStyle = 'rgba(255,80,80,'+blink+')'; ctx.fill(); ctx.restore(); } }
     needRender = false;
