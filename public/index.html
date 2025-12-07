@@ -279,7 +279,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
     animateMove(fromIdx,toIdx, players[f.owner] ? players[f.owner].color : '#fff');
     if(t.owner === f.owner){ t.troops += send; }
     else {
-      if(send > t.troops){
+      let required = t.troops;
+ if(players && players[f.owner] && players[f.owner].capital===toIdx){}
+ if(players && players[t.owner] && players[t.owner].capital===toIdx){ required = Math.floor(t.troops*1.5); }
+ if(send > required){
         const defeatedOwner = t.owner;
         t.owner = f.owner;
         t.troops = send - t.troops;
@@ -369,7 +372,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
     }
   }
 
-  function drawCapitalMarker(cellIdx){ if(!grid[cellIdx]) return; const c = grid[cellIdx]; const s = worldToScreen(c.x, c.y); ctx.beginPath(); ctx.lineWidth = Math.max(2, 3 * cam.scale); ctx.strokeStyle = 'rgba(255,215,0,0.95)'; ctx.arc(s.x, s.y, HEX * cam.scale + 6 * cam.scale, 0, Math.PI*2); ctx.stroke(); ctx.fillStyle = 'rgba(255,215,0,0.95)'; ctx.font = (18 * Math.max(0.7, cam.scale)) + 'px Tahoma'; ctx.textAlign = 'center'; ctx.fillText('★', s.x, s.y - (HEX * cam.scale + 4 * cam.scale)); }
+  function drawCapitalMarker(cellIdx){ if(!grid[cellIdx]) return; const c = grid[cellIdx]; const s = worldToScreen(c.x, c.y); ctx.beginPath(); ctx.lineWidth = Math.max(2, 3 * cam.scale); ctx.strokeStyle = 'rgba(255,215,0,0.95)'; ctx.arc(s.x, s.y, HEX * cam.scale + 6 * cam.scale, 0, Math.PI*2); ctx.stroke(); ctx.fillStyle = 'rgba(255,215,0,0.95)'; ctx.font = (18 * Math.max(0.7, cam.scale)) + 'px Tahoma'; ctx.textAlign = 'center'; ctx.fillText('★', s.x, s.y - (HEX * cam.scale + 4 * cam.scale)); 
+ ctx.font=(20*cam.scale)+'px Tahoma'; ctx.fillText('🛡', s.x, s.y + (HEX*cam.scale+10*cam.scale));}
 
   function render(){ if(!ctx) return; if(!needRender && animations.length===0 && effects.length===0) return;
     ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,W,H); ctx.fillStyle = '#0d1117'; ctx.fillRect(0,0,W,H); if(!grid||grid.length===0) return;
