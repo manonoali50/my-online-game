@@ -374,7 +374,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
   function render(){ if(!ctx) return; if(!needRender && animations.length===0 && effects.length===0) return;
     ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,W,H); ctx.fillStyle = '#0d1117'; ctx.fillRect(0,0,W,H); if(!grid||grid.length===0) return;
     for(let i=0;i<grid.length;i++){ const c = grid[i]; const s = worldToScreen(c.x, c.y); drawHex(s.x, s.y, HEX * cam.scale); ctx.fillStyle = c.owner == null ? '#ffffff' : players[c.owner] ? players[c.owner].color : '#fff'; ctx.fill(); if(i === selected){ ctx.strokeStyle = '#00ff00'; ctx.lineWidth = 3; ctx.stroke(); } ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.font = (14 * Math.max(0.7, cam.scale)) + 'px Tahoma'; ctx.fillText(c.troops, s.x, s.y + (5 * cam.scale)); }
-    for(const p of players){ if(p && p.capital != null && p.alive){ drawCapitalMarker(p.capital); } }
+    for(const p of players){
+      if(p && typeof p.capital === 'number' && p.alive && window.grid && window.grid[p.capital] && window.grid[p.capital].owner === p.id){
+        drawCapitalMarker(p.capital);
+      }
+    }
     const now = performance.now();
     for(const p of players){ if(!p || p.capital==null || !p.alive) continue; const capIdx = p.capital; const cap = grid[capIdx]; if(!cap) continue; let danger=false; for(let i=0;i<grid.length;i++){ const cell = grid[i]; if(cell.owner != null && cell.owner !== p.id){ const d = Math.hypot(cell.x - cap.x, cell.y - cap.y); if(d < DEFEND_RADIUS){ danger=true; break; } } } if(danger){ const s = worldToScreen(cap.x, cap.y); const blink = 0.5 + 0.5 * Math.sin(now * 0.015); ctx.save(); ctx.translate(s.x, s.y - (HEX * cam.scale + 18 * cam.scale)); ctx.scale(cam.scale, cam.scale); ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(7, 8); ctx.lineTo(-7, 8); ctx.closePath(); ctx.fillStyle = 'rgba(255,80,80,'+blink+')'; ctx.fill(); ctx.restore(); } }
     needRender = false;
@@ -657,18 +661,53 @@ let pingInterval=null;
 const pingBtn=document.getElementById("pingToggle");
 const pingDiv=document.getElementById("pingDisplay");
 
+// helper to attach pong listener to current socket
+function attachPongListener(sock){
+  try{
+    if(!sock) return;
+    // avoid adding duplicate handlers
+    if(sock._pongAttached) return;
+    sock._pongAttached = true;
+    sock.addEventListener("message", ev=>{
+      try{
+        const d = JSON.parse(ev.data);
+        if(d && (d.type === "pong" || d.t !== undefined && d.type === "pong")){
+          // compute RTT and display (keeps same UI)
+          pingDiv.textContent = (Date.now() - d.t) + " ms";
+        }
+      }catch(e){}
+    });
+  }catch(e){}
+}
+
+// if socket-client sets window.socket, try to attach immediately
+if(window.socket) attachPongListener(window.socket);
+
+// also expose a small hook so socket-client can call attachPongListener after reconnects
+window._attachPongListener = attachPongListener;
+
 pingBtn.onclick=()=>{
  pingOn=!pingOn;
  if(pingOn){
    pingBtn.style.background="#0a0";
    pingDiv.style.display="block";
-   if(window.socket){
-     pingInterval=setInterval(()=>{
-       try{
-         const t=Date.now();
+   // start sending pings every 1000ms
+   if(pingInterval) clearInterval(pingInterval);
+   pingInterval=setInterval(()=>{
+     try{
+       const t=Date.now();
+       if(window.socket && window.socket.readyState===1){
          window.socket.send(JSON.stringify({type:"ping", t}));
-       }catch(e){}
-     },1000);
+       }
+     }catch(e){}
+   },1000);
+ } else {
+   pingBtn.style.background="#a00";
+   pingDiv.style.display="none";
+   clearInterval(pingInterval);
+   pingInterval = null;
+ }
+};,1000);
    }
  } else {
    pingBtn.style.background="#a00";
