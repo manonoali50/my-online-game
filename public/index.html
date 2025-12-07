@@ -729,20 +729,32 @@ if(window.socket){
 </script>
 
 
+<!-- Leaderboard Panel -->
+<div id="leaderboardPanel" style="position:fixed;right:0;top:80px;width:220px;background:rgba(20,26,38,0.85);color:white;border-radius:10px 0 0 10px;padding:6px;z-index:2500;transition:transform .25s">
+  <div id="leaderboardHeader" style="background:rgba(255,255,255,.08);padding:6px;text-align:center;cursor:pointer;font-weight:bold">الترتيب</div>
+  <div id="leaderboardContent" style="max-height:60vh;overflow-y:auto;font-size:13px"></div>
+</div>
+
 <script>
-window.applyDelta = function(delta){
-  try{
-    if(!delta || !delta.changes) return;
-    if(!window.grid) window.grid = [];
-    for(const c of delta.changes){
-      if(typeof c.i === 'number' && window.grid[c.i]){
-        if(typeof c.owner !== 'undefined') window.grid[c.i].owner = c.owner;
-        if(typeof c.troops !== 'undefined') window.grid[c.i].troops = c.troops;
-      }
-    }
-    if(window.requestRender) window.requestRender(); else if(typeof window.needRender !== 'undefined') window.needRender = true;
-  }catch(e){ console.warn('applyDelta failed', e); }
-};
+function updateLeaderboard(){
+  if(!window.players || !window.grid) return;
+  const lb=document.getElementById("leaderboardContent");
+  const stats=window.players.map(p=>{
+    const owned=window.grid.filter(c=>c.owner===p.index).length;
+    const troops=window.grid.filter(c=>c.owner===p.index).reduce((a,c)=>a+c.troops,0);
+    return {name:p.name,color:p.color,owned,troops,alive:p.alive};
+  }).sort((a,b)=>b.owned-a.owned);
+  lb.innerHTML=stats.map(s=>\`<div style="margin:4px 0;padding:6px;background:rgba(255,255,255,.06);border-radius:6px;opacity:\${s.alive?1:.4}">
+    <div style="display:flex;align-items:center;gap:6px">
+      <div style="width:12px;height:12px;border-radius:3px;background:\${s.color}"></div>
+      <b>\${s.name}</b>
+    </div>
+    <div style="font-size:11px;margin-top:2px">خلايا: \${s.owned} | جنود: \${s.troops}</div>
+  </div>\`).join("");
+}
+setInterval(updateLeaderboard,800);
+document.getElementById("leaderboardHeader").onclick=()=>document.getElementById("leaderboardPanel").classList.toggle("closed");
 </script>
+
 </body>
 </html>
