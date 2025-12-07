@@ -12,6 +12,10 @@
 
     function connect(){
     ws = new WebSocket(url);
+    // expose raw socket for ping UI and other helpers
+    window.socket = ws;
+    // if index.html provided a hook to attach pong listener, call it
+    try{ if(window._attachPongListener) window._attachPongListener(ws); }catch(e){}
     ws.onopen = ()=>{ window._debugLog && window._debugLog('WS connected: ' + url); };
     ws.onmessage = e=>{ 
       try{ const msg = JSON.parse(e.data); handle(msg); }catch(err){ window._debugLog('Invalid WS msg: '+ e.data); }
