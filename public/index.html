@@ -630,7 +630,13 @@ requestAnimationFrame(continuousRenderLoop);
 </script>
 
 
-<!-- Force render loop for mobile -->
-<script>setInterval(()=>{ try{ render(); }catch(e){} },50);</script>
+<script>
+try{
+    if(typeof applyState !== 'undefined') window.applyState = applyState;
+    if(typeof render !== 'undefined') window.render = render;
+    if(typeof updateRoomPlayers !== 'undefined') window.updateRoomPlayers = updateRoomPlayers;
+}catch(e){}
+</script>
+
 </body>
 </html>
