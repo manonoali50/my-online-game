@@ -142,6 +142,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   var players = [];
   var cam = { x:0, y:0, scale:1 };
+  // expose cam so external code (server/client) can center camera on capital
+  window.cam = cam;
   var selected = null;
   var animations = [];
   var effects = [];
@@ -194,13 +196,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
   function isNeighbor(a,b){ if(!grid||!grid[a]||!grid[b]) return false; return Math.hypot(grid[a].x-grid[b].x, grid[a].y-grid[b].y) < HEX * 1.8; }
 
   function setupPlayers(n){
-    players = []; // will use server-provided colors in online mode
-    const usedColors = new Set();
-    const colorPool = ['#3399ff','#ff5555','#ffe047','#8a60ff','#00c48c','#ff8800','#33ffaa','#aa33ff','#ff33aa'];
+    players = [];
+    // fixed 4-color pool (red, blue, green, yellow)
+    const colorPool = ['#ff5555','#3399ff','#00c48c','#ffe047'];
     for(let i=0;i<n;i++){
-      let color;
-      do { color = colorPool[Math.floor(Math.random() * colorPool.length)]; } while(usedColors.has(color));
-      usedColors.add(color);
+      // assign colors in order, reuse if n>4
+      const color = colorPool[i % colorPool.length];
       players.push({ id:i, color:color, name:'P'+(i+1), capital:null, alive:true });
     }
     updateLegend();
@@ -367,7 +368,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   function render(){ if(!ctx) return; if(!needRender && animations.length===0 && effects.length===0) return;
     ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,W,H); ctx.fillStyle = '#0d1117'; ctx.fillRect(0,0,W,H); if(!grid||grid.length===0) return;
     for(let i=0;i<grid.length;i++){ const c = grid[i]; const s = worldToScreen(c.x, c.y); drawHex(s.x, s.y, HEX * cam.scale); ctx.fillStyle = c.owner == null ? '#ffffff' : players[c.owner] ? players[c.owner].color : '#fff'; ctx.fill(); if(i === selected){ ctx.strokeStyle = '#00ff00'; ctx.lineWidth = 3; ctx.stroke(); } ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.font = (14 * Math.max(0.7, cam.scale)) + 'px Tahoma'; ctx.fillText(c.troops, s.x, s.y + (5 * cam.scale)); }
-    for(const p of players){ if(p && typeof p.capital !== 'undefined' && p.capital != null && p.alive){ const capIdx = p.capital; const capCell = grid[capIdx]; if(capCell && capCell.owner === p.id){ drawCapitalMarker(p.capital); } } }
+    for(const p of players){ if(p && p.capital != null && p.alive){ drawCapitalMarker(p.capital); } }
     const now = performance.now();
     for(const p of players){ if(!p || p.capital==null || !p.alive) continue; const capIdx = p.capital; const cap = grid[capIdx]; if(!cap) continue; let danger=false; for(let i=0;i<grid.length;i++){ const cell = grid[i]; if(cell.owner != null && cell.owner !== p.id){ const d = Math.hypot(cell.x - cap.x, cell.y - cap.y); if(d < DEFEND_RADIUS){ danger=true; break; } } } if(danger){ const s = worldToScreen(cap.x, cap.y); const blink = 0.5 + 0.5 * Math.sin(now * 0.015); ctx.save(); ctx.translate(s.x, s.y - (HEX * cam.scale + 18 * cam.scale)); ctx.scale(cam.scale, cam.scale); ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(7, 8); ctx.lineTo(-7, 8); ctx.closePath(); ctx.fillStyle = 'rgba(255,80,80,'+blink+')'; ctx.fill(); ctx.restore(); } }
     needRender = false;
@@ -413,25 +414,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   function startGame(){ try{ if(!grid || grid.length < 8) buildGrid(); const cnt = playerCount ? Math.max(2, Math.min(4, parseInt(playerCount.value,10) || 4)) : 4; setupPlayers(cnt); seedCapitals(); startProduction(prodRate ? parseInt(prodRate.value,10) : 900); if(botTimer) clearInterval(botTimer); botTimer = setInterval(botTick, 900); document.getElementById('lobby').style.display = 'none'; updateLegend(); needRender = true; }catch(err){ console.error(err); dbg.style.display='block'; dbg.textContent = String(err); } }
   window.startGame = startGame; if(startBtn) startBtn.addEventListener('click', startGame);
 
-  let last = performance.now(); 
-function frame(now){
-  // continuous render loop — always update and render so client shows server changes without input
-  try{ requestAnimationFrame(frame); }catch(e){ /* ignore */ }
-  try{
-    const dt = (window._lastFrameTime ? (now - window._lastFrameTime) : 16);
-    window._lastFrameTime = now;
-    // update animations/effects with dt (ms)
-    if(typeof updateEffectsAndAnimations === 'function'){
-      try{ updateEffectsAndAnimations(dt); }catch(e){ console.warn('updateEffectsAndAnimations failed', e); }
-    }
-    // always render every frame so client stays in sync with server state
-    if(typeof render === 'function'){
-      try{ render(); }catch(e){ console.warn('render failed', e); }
-    }
-  }catch(e){ console.warn('frame loop caught', e); }
-}
-requestAnimationFrame(frame);
- } requestAnimationFrame(frame);
+  let last = performance.now(); function frame(now){ const dt = now - last; last = now; try{ updateEffectsAndAnimations(dt); if(needRender || animations.length>0 || effects.length>0){ render(); } }catch(e){ console.error(e); dbg.style.display='block'; dbg.textContent = String(e); } requestAnimationFrame(frame); } requestAnimationFrame(frame);
 
   buildGrid(); setupPlayers(4); seedCapitals(); updateLegend(); needRender = true;
 
@@ -581,49 +564,19 @@ window.applyState = function(state){
     }
 
     // update local UI
-    if(typeof updateLegend === 'function') try{ updateLegend(); }catch
-  // auto-center camera on this player's capital once when first state arrives (do not change zoom)
-  try{
-    if(window.isInRoom && !window._centeredOnStart){
-      var meIndex = null;
-      try{ meIndex = (window.socketClient && window.socketClient.getPlayerIndex) ? window.socketClient.getPlayerIndex() : null; }catch(e){ meIndex = null; }
-      if(meIndex === null && window.players && window.players.length > 0){
-        // try to find a player object flagged as 'isHost' or with name 'P1' as fallback
-        for(var ii=0; ii<window.players.length; ii++){ if(window.players[ii].isHost){ meIndex = window.players[ii].index; break; } }
-      }
-      if(meIndex !== null){
-        var me = (window.players||[]).find(function(pp){ return pp.index === meIndex; });
-        if(me && typeof me.capital === 'number' && window.grid && window.grid[me.capital]){
-          var cap = window.grid[me.capital];
-          if(window.cam){ window.cam.x = -cap.x; window.cam.y = -cap.y; }
-          window._centeredOnStart = true;
-        }
-      }
-    }
-  }catch(err){ console.warn('auto-center failed', err); }
-(e){}
+    if(typeof updateLegend === 'function') try{ updateLegend(); }catch(e){}
     if(typeof window.updateRoomPlayers === 'function'){
       try{ window.updateRoomPlayers(window.players.map(p=>({index:p.index,name:p.name,isHost:p.isHost,color:p.color,capital:p.capital,alive:p.alive}))); }catch(e){}
     }
 
     // render quickly
-    try{
-  if(window.isInRoom && !window._centeredOnStart){
-    const me = (window.players||[]).find(p=>p.index===window.socketClient.getPlayerIndex());
-    if(me && typeof me.capital==='number'){
-      const cap=window.grid[me.capital]; if(window.cam){ window.cam.x=-cap.x; window.cam.y=-cap.y; }
-      window._centeredOnStart=true;
-    }
-  }
-}catch(e){console.warn('auto-center',e);}
-if(typeof window.needRender !== 'undefined') window.needRender = true;
+    if(typeof window.needRender !== 'undefined') window.needRender = true;
   }catch(e){
     console.error('applyState error', e);
   }
 };
 
-window._centeredOnStart=false;
-window.startOnlineGame = function(state){ try{
+window.startOnlineGame = function(state){
   try{
     if(!state) return;
     window.isOnline = true;
@@ -661,16 +614,7 @@ window.startOnlineGame = function(state){ try{
       }
     }catch(e){ console.warn('camera set failed', e); }
 
-    try{
-  if(window.isInRoom && !window._centeredOnStart){
-    const me = (window.players||[]).find(p=>p.index===window.socketClient.getPlayerIndex());
-    if(me && typeof me.capital==='number'){
-      const cap=window.grid[me.capital]; if(window.cam){ window.cam.x=-cap.x; window.cam.y=-cap.y; }
-      window._centeredOnStart=true;
-    }
-  }
-}catch(e){console.warn('auto-center',e);}
-if(typeof window.needRender !== 'undefined') window.needRender = true;
+    if(typeof window.needRender !== 'undefined') window.needRender = true;
   }catch(e){
     console.error('startOnlineGame error', e);
   }
