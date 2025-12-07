@@ -61,7 +61,7 @@
         try{ startRenderLoop(); }catch(e){}
 
         if(waitingForStart){ waitingForStart = false; window._debugLog && window._debugLog('Starting online game from state'); if(window.startOnlineGame){ window.startOnlineGame(d.state); } }
-        window.applyState && window.applyState(d.state); try{ if(window.render) window.render(); }catch(e){}
+        window.lastStateFromServer = d.state; window.applyState && window.applyState(d.state);
         window.needsRender = true;
         if(window.render) window.render(); window.needsRender = true; try{ startRenderLoop(); }catch(e){}
         document.getElementById('roomInfo') && (document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + (roomId||'—'));
