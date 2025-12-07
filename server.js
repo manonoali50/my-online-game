@@ -207,6 +207,10 @@ function handleMessage(ws, msg){
       }
       broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: playersForState } } });
     }, Math.max(50, (d.prodRate||200)));
+    /* send each player their base so their camera centers immediately (including host) */
+    for(const p of room.players){
+      try{ p.ws.send(JSON.stringify({ t:'setCameraToBase', d:{ base: p.capital } })); }catch(e){/*ignore*/}
+    }
     broadcast(room, { t:'game_started', d:{} });
     broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: playersForState } } });
   } else if(t==='action'){
