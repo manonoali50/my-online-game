@@ -46,6 +46,30 @@ function ensureValidRoomGrid(room){
         const rp = room.players.find(p=>p.index===pa.index);
         if(rp) rp.capital = pa.capital;
       }
+
+
+function clampNumber(v, minV, maxV){ if(typeof v !== 'number' || !isFinite(v)) return minV; return Math.max(minV, Math.min(maxV, v)); }
+
+function sanitizeCellForSend(cell){
+  return {
+    x: clampNumber(cell.x, -1e6, 1e6),
+    y: clampNumber(cell.y, -1e6, 1e6),
+    owner: (cell.owner === null ? null : (Number.isInteger(cell.owner) ? cell.owner : null)),
+    troops: clampNumber(Math.floor(Number(cell.troops) || 0), 0, 1000000),
+    neighbors: Array.isArray(cell.neighbors) ? cell.neighbors.filter(n=>Number.isInteger(n) && n>=0 && n<10000).slice(0,40) : []
+  };
+}
+
+function sanitizeState(room){
+  try{
+    const safeGrid = room.grid.map(sanitizeCellForSend);
+    const safePlayers = room.players.map(p=>({ index: p.index, name: p.name||('P'+(p.index+1)), isHost: (room.host===p.index), capital: (typeof p.capital==='number' ? p.capital : null), alive: !!p.alive, color: p.color||'#999' }));
+    return { grid: safeGrid, players: safePlayers };
+  }catch(e){
+    console.warn('sanitizeState failed', e);
+    return { grid: buildGridForServer(Math.max(8,10), Math.max(6,8)).map(sanitizeCellForSend), players: room.players.map(p=>({ index: p.index, name: p.name||('P'+(p.index+1)), isHost: (room.host===p.index), capital: null, alive: !!p.alive, color: p.color||'#999' })) };
+  }
+}
     }
   }catch(e){ console.warn('ensureValidRoomGrid failed', e); }
 }
@@ -228,15 +252,18 @@ function handleMessage(ws, msg){
         clearInterval(room.prodTimer);
         room.running = false;
         const winner = alivePlayers.length===1 ? alivePlayers[0].index : null;
-        broadcast(room, { t:'game_over', d:{ winner, winnerName: winner!=null ? alivePlayers[0].name : null, state:{ grid: room.grid, players: playersForState } } });
+        const __safe_state = sanitizeState(room);
+        broadcast(room, { t:'game_over', d:{ winner, winnerName: winner!=null ? alivePlayers[0].name : null, state: __safe_state } });
         return;
       }
-      broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: playersForState } } });
+      const __safe_state = sanitizeState(room);
+    broadcast(room, { t:'state', d:{ state: __safe_state } });
     }, Math.max(50, (d.prodRate||100)));
     ensureValidRoomGrid(room);
     broadcast(room, { t:'game_started', d:{} });
-    broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: playersForState } } });
-  } else if(t==='action'){
+    const __safe_state = sanitizeState(room);
+    broadcast(room, { t:'state', d:{ state: __safe_state } });
+    } else if(t==='action'){
     const room = findRoomByWs(ws);
     if(!room) return;
     const action = d.action;
@@ -244,14 +271,16 @@ function handleMessage(ws, msg){
       moveTroopsServer(room.grid, room.players, action.from, action.to, action.ratio);
       // prepare players for state with color field
       const playersForState = room.players.map(p=>({ index:p.index, name:p.name, isHost:(room.host===p.index), capital:p.capital, alive:p.alive, color:p.color }));
-      broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: playersForState } } });
-      // after move check victory
+      const __safe_state = sanitizeState(room);
+    broadcast(room, { t:'state', d:{ state: __safe_state } });
+    // after move check victory
       const alivePlayers = room.players.filter(p=>p.alive);
       if(alivePlayers.length <= 1){
         if(room.prodTimer) clearInterval(room.prodTimer);
         room.running = false;
         const winner = alivePlayers.length===1 ? alivePlayers[0].index : null;
-        broadcast(room, { t:'game_over', d:{ winner, winnerName: winner!=null ? alivePlayers[0].name : null, state:{ grid: room.grid, players: playersForState } } });
+        const __safe_state = sanitizeState(room);
+        broadcast(room, { t:'game_over', d:{ winner, winnerName: winner!=null ? alivePlayers[0].name : null, state: __safe_state } });
       }
     }
   }
