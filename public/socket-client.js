@@ -3,82 +3,96 @@
   const host = location.host;
   const url = proto + host + '/ws';
   let ws = null;
-  let waitingForStart = false;
   let roomId = null;
   let playerIndex = null;
   let isHost = false;
-  let reconnectTimer = null;
 
   function connect(){
     ws = new WebSocket(url);
     ws.onopen = ()=>{ window._debugLog && window._debugLog('WS connected: ' + url); };
     ws.onmessage = e=>{ 
-      try{ const msg = JSON.parse(e.data); handle(msg); }catch(err){ window._debugLog('Invalid WS msg: '+ e.data); }
+      try{ const msg = JSON.parse(e.data); handle(msg); }catch(err){ window._debugLog && window._debugLog('Invalid WS msg: '+ e.data); }
     };
-    ws.onclose = ()=>{ window._debugLog('WS closed, reconnecting...'); reconnectTimer = setTimeout(connect,1500); };
-    ws.onerror = err=>{ window._debugLog('WS error: ' + err); ws.close(); };
+    ws.onclose = ()=>{ window._debugLog && window._debugLog('WS closed'); setTimeout(connect, 1000); };
+    ws.onerror = ()=>{};
   }
   connect();
 
-  function send(t,d){ if(!ws||ws.readyState!==1){ window._debugLog('WS not ready'); return; } ws.send(JSON.stringify({t,d})); }
+  function send(t, d){ if(!ws || ws.readyState!==1) return; ws.send(JSON.stringify({ t, d })); }
 
   function handle(msg){
+    if(!msg || !msg.t) return;
     const t = msg.t, d = msg.d;
-    window._debugLog && window._debugLog({t,d});
-    if(t==='room_created'){
-      roomId = d.roomId; playerIndex = d.playerIndex; isHost = true;
-      window.isInRoom = true;
-      alert('تم إنشاء الغرفة: ' + roomId + '\nانت المضيف.');
-      window.updateRoomPlayers && window.updateRoomPlayers(d.players || []);
-      document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + roomId;
-      const leaveBtn = document.getElementById('leaveRoomBtn');
-      if(leaveBtn) leaveBtn.style.display = 'inline-block';
-    } else if(t==='joined'){
-      roomId = d.roomId; playerIndex = d.playerIndex; isHost = d.isHost;
-      window.isInRoom = true;
-      alert('انضممت للغرفة: ' + roomId + (isHost? ' (مضيف)':''));
-      window.updateRoomPlayers && window.updateRoomPlayers(d.players || []);
-      document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + roomId;
-      const leaveBtn = document.getElementById('leaveRoomBtn');
-      if(leaveBtn) leaveBtn.style.display = 'inline-block';
-    } else if(t==='player_joined' || t==='player_left' || t==='host_changed'){
-      window._debugLog('room event: ' + t);
-      if(d && d.players) window.updateRoomPlayers(d.players);
-    } else if(t==='state'){
-      if(d && d.state){
-        if(waitingForStart){ waitingForStart = false; window._debugLog && window._debugLog('Starting online game from state'); if(window.startOnlineGame){ window.startOnlineGame(d.state); } }
-        window.applyState && window.applyState(d.state);
-        document.getElementById('roomInfo') && (document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + (roomId||'—'));
-        if(d.players) window.updateRoomPlayers(d.players);
-      }
-    } else if(t==='error'){
-      alert('خطأ: ' + (d && d.message));
-    } else if(t==='game_started'){ waitingForStart = true; window._debugLog && window._debugLog('game_started received'); } else if(t==='host_grid_received'){
-      window._debugLog && window._debugLog('host grid received by server');
-    } else if(t==='game_over'){
-      // server declared game over
-      try{
-        const winner = d && d.winner;
-        if(winner != null){
-          if(window.applyState) window.applyState(d.state || {});
-          if(window.victoryOverlay) {
-            document.getElementById('victoryText').textContent = 'الفائز هو:';
-            document.getElementById('victorName').textContent = (d.winnerName || ('P'+(winner+1)));
-            document.getElementById('victoryOverlay').style.display = 'flex';
+    switch(t){
+      case 'room_created':
+      case 'joined':
+        roomId = (d.roomId || d.roomId) || (d.roomId);
+        playerIndex = (d.playerIndex !== undefined) ? d.playerIndex : playerIndex;
+        isHost = !!(d.isHost);
+        // update lobby players UI if available
+        if(d.players && window.updateLobbyUI) window.updateLobbyUI(d.players);
+        break;
+      case 'player_joined':
+      case 'player_left':
+      case 'host_changed':
+        if(d.players && window.updateLobbyUI) window.updateLobbyUI(d.players);
+        break;
+      case 'host_grid_received':
+        // ignore
+        break;
+      case 'game_started':
+        // nothing extra here
+        break;
+      case 'state':
+        try{
+          const state = d.state || {};
+          if(state.grid) window.grid = state.grid;
+          if(state.players) window.players = state.players.map(p=>({ index:p.index, name:p.name, color:p.color || '#999', capital:p.capital, alive:!!p.alive }));
+          // force immediate render/update without needing user input
+          if(window.startOnlineGame) window.startOnlineGame(state);
+          if(window.render) window.render();
+        }catch(e){ console.warn('state handling failed', e); }
+        break;
+      case 'game_over':
+        try{
+          const state = d.state || {};
+          if(state.grid) window.grid = state.grid;
+          if(state.players) window.players = state.players;
+          if(window.render) window.render();
+        }catch(e){ console.warn('game_over handling failed', e); }
+        break;
+      case 'setCameraToBase':
+        try{
+          const base = d && d.base;
+          if(typeof base === 'number' && window.grid && window.grid[base]){
+            const cap = window.grid[base];
+            if(window.cam){ window.cam.x = -cap.x; window.cam.y = -cap.y; if(window.cam.scale) window.cam.scale = Math.max(0.9,1.0); }
+            if(window.render) window.render();
+          } else if(base && base.x !== undefined && base.y !== undefined){
+            if(window.cam){ window.cam.x = -base.x; window.cam.y = -base.y; if(window.cam.scale) window.cam.scale = Math.max(0.9,1.0); }
+            if(window.render) window.render();
           }
-        }
-      }catch(e){ console.warn('game_over handling failed', e); }
+        }catch(e){ console.warn('setCameraToBase failed', e); }
+        break;
+      case 'error':
+        console.warn('server error', d && d.message);
+        break;
+      default:
+        // unknown message
+        break;
     }
   }
 
   window.socketClient = {
     createRoom(opts){ send('create_room', opts || {}); },
     joinRoom(opts){ send('join_room', opts || {}); },
-    leaveRoom(){ send('leave_room', {roomId}); roomId=null; playerIndex=null; isHost=false; window.isInRoom=false; const leaveBtn = document.getElementById('leaveRoomBtn'); if(leaveBtn) leaveBtn.style.display='none'; },
+    leaveRoom(){ send('leave_room', {roomId}); roomId=null; },
     sendAction(action){ send('action', { action, roomId }); },
     startGame(opts){ 
       if(isHost && window.grid && window.grid.length){
-        send('host_grid', { roomId, grid: window.grid, players: (window.players || []).map(p=>({ index: p.index, capital: p.capital, name: p.name })) });
+        // send host grid and players to server then start
+        const playersForHost = (window.players || []).map(p=>({ index:p.index, capital:p.capital, name:p.name }));
+        send('host_grid', { roomId, grid: window.grid, players: playersForHost });
         setTimeout(()=> send('start_game', { roomId, prodRate: (opts && opts.prodRate) || 900 }), 150);
       } else {
         send('start_game', { roomId, prodRate: (opts && opts.prodRate) || 900 });
