@@ -619,6 +619,14 @@ window.startOnlineGame = function(state){
     console.error('startOnlineGame error', e);
   }
 };
+
+
+function continuousRenderLoop(){
+    try{ if(window.render) window.render(); }catch(e){}
+    requestAnimationFrame(continuousRenderLoop);
+}
+requestAnimationFrame(continuousRenderLoop);
+
 </script>
 
 </body>
