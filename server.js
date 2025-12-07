@@ -98,6 +98,11 @@ wss.on('connection', function connection(ws){
   ws.on('message', function incoming(message){
     try{
       const msg = JSON.parse(message);
+      // support a lightweight ping/pong (client sends {type:'ping', t:...})
+      if(msg && msg.type === 'ping' && typeof msg.t !== 'undefined'){
+        try{ ws.send(JSON.stringify({ type: 'pong', t: msg.t })); }catch(e){}
+        return;
+      }
       handleMessage(ws, msg);
     } catch(e){ console.error('invalid msg', e); }
   });
