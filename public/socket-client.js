@@ -10,14 +10,7 @@
   let reconnectTimer = null;
   let __renderLoopStarted = false;
 
-  function startRenderLoop(){
-    if(__renderLoopStarted) return; __renderLoopStarted = true;
-    function loop(){
-      try{ if(window.render) window.render(); window.needsRender = true; try{ startRenderLoop(); }catch(e){} }catch(e){}
-      requestAnimationFrame(loop);
-    }
-    requestAnimationFrame(loop);
-  }
+  
 
   function connect(){
     ws = new WebSocket(url);
@@ -57,13 +50,13 @@
     } else if(t==='state'){
       if(d && d.state){
         // ensure continuous rendering so UI updates without user interaction (mobile browsers)
-        window.needsRender = true;
-        try{ startRenderLoop(); }catch(e){}
+        window.needRender = true;
+        try{  }catch(e){}
 
         if(waitingForStart){ waitingForStart = false; window._debugLog && window._debugLog('Starting online game from state'); if(window.startOnlineGame){ window.startOnlineGame(d.state); } }
-        window.applyState && window.applyState(d.state);
-        window.needsRender = true;
-        if(window.render) window.render(); window.needsRender = true; try{ startRenderLoop(); }catch(e){}
+        try{ window.applyState && window.applyState(d.state); }catch(e){}
+        window.needRender = true;
+        if(window.render) window.render(); window.needRender = true; try{  }catch(e){}
         document.getElementById('roomInfo') && (document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + (roomId||'—'));
         if(d.players) window.updateRoomPlayers(d.players);
       }
@@ -81,7 +74,7 @@
             window.cam.x = -cap.x;
             window.cam.y = -cap.y;
           }
-          if(window.render) window.render(); window.needsRender = true; try{ startRenderLoop(); }catch(e){}
+          if(window.render) window.render(); window.needRender = true; try{  }catch(e){}
         }
       }catch(e){ console.warn('Camera set failed', e); }
 
