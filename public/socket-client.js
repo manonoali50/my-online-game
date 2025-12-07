@@ -13,7 +13,7 @@
     ws = new WebSocket(url);
     ws.onopen = ()=>{ window._debugLog && window._debugLog('WS connected: ' + url); };
     ws.onmessage = e=>{ 
-      try{ const msg = JSON.parse(e.data); handle(msg); }catch(err){ window._debugLog('Invalid WS msg: '+ e.data); }
+      try{ if(e.data && e.data.length>500000){ window._debugLog && window._debugLog('Rejecting huge WS payload, len='+e.data.length); return; } const msg = JSON.parse(e.data); handle(msg); }catch(err){ window._debugLog('Invalid WS msg: '+ e.data); }
     };
     ws.onclose = ()=>{ window._debugLog('WS closed, reconnecting...'); reconnectTimer = setTimeout(connect,1500); };
     ws.onerror = err=>{ window._debugLog('WS error: ' + err); ws.close(); };
@@ -46,7 +46,7 @@
       if(d && d.players) window.updateRoomPlayers(d.players);
     } else if(t==='state'){
       if(d && d.state){
-        if(waitingForStart){ waitingForStart = false; window._debugLog && window._debugLog('Starting online game from state'); if(window.startOnlineGame){ window.startOnlineGame(d.state); } }
+        if (waitingForStart) { waitingForStart = false; window._debugLog && window._debugLog('game_started -> state'); try{ if(window.startOnlineGame){ window.startOnlineGame(d.state); } } catch(err){ window._debugLog && window._debugLog('startOnlineGame threw: '+err); try{ window.isInRoom=true; const lobby=document.getElementById('lobby'); if(lobby) lobby.style.display='none'; }catch(e){} } } }
         window.applyState && window.applyState(d.state);
         document.getElementById('roomInfo') && (document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + (roomId||'—'));
         if(d.players) window.updateRoomPlayers(d.players);
@@ -77,8 +77,11 @@
     leaveRoom(){ send('leave_room', {roomId}); roomId=null; playerIndex=null; isHost=false; window.isInRoom=false; const leaveBtn = document.getElementById('leaveRoomBtn'); if(leaveBtn) leaveBtn.style.display='none'; },
     sendAction(action){ send('action', { action, roomId }); },
     startGame(opts){ 
+      // sanitize client grid before sending to server
+      function sanitizeClientGrid(g){ try{ if(!Array.isArray(g)) return []; return g.map(c=>({ x: (typeof c.x==='number'?c.x:0), y:(typeof c.y==='number'?c.y:0), owner: (c.owner===null?null:(Number.isInteger(c.owner)?c.owner:null)), troops: Math.max(0, Math.floor(Number(c.troops)||0)), neighbors: Array.isArray(c.neighbors)? c.neighbors.filter(n=>Number.isInteger(n)).slice(0,40):[] })); }catch(e){ return []; } }
+
       if(isHost && window.grid && window.grid.length){
-        send('host_grid', { roomId, grid: window.grid, players: (window.players || []).map(p=>({ index: p.index, capital: p.capital, name: p.name })) });
+        send('host_grid', { roomId, grid: sanitizeClientGrid(window.grid), players: (window.players || []).map(p=>({ index: p.index, capital: p.capital, name: p.name })) });
         setTimeout(()=> send('start_game', { roomId, prodRate: (opts && opts.prodRate) || 900 }), 150);
       } else {
         send('start_game', { roomId, prodRate: (opts && opts.prodRate) || 900 });
