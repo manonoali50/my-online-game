@@ -10,7 +10,6 @@
   let reconnectTimer = null;
   let __renderLoopStarted = false;
 
-  
   function startRenderLoop(){
     if(__renderLoopStarted) return;
     __renderLoopStarted = true;
@@ -20,7 +19,6 @@
       const dt = Math.max(0, now - last);
       last = now;
       try{
-        // keep animations/effects updated if page exposes helper
         if(typeof window.updateEffectsAndAnimations === 'function'){
           try{ window.updateEffectsAndAnimations(dt); }catch(e){}
         }
@@ -33,7 +31,7 @@
     }
     try{ requestAnimationFrame(loop); }catch(e){ setTimeout(loop,16); }
   }
-catch(e){} }catch(e){}
+catch(e){}
       requestAnimationFrame(loop);
     }
     requestAnimationFrame(loop);
@@ -76,15 +74,15 @@ catch(e){} }catch(e){}
       if(d && d.players) window.updateRoomPlayers(d.players);
     } else if(t==='state'){
       if(d && d.state){
+        // ensure render loop is started once
+        startRenderLoop();
+        
         // ensure continuous rendering so UI updates without user interaction (mobile browsers)
         window.needsRender = true;
-        try{ startRenderLoop(); }catch(e){}
-
         if(waitingForStart){ waitingForStart = false; window._debugLog && window._debugLog('Starting online game from state'); if(window.startOnlineGame){ window.startOnlineGame(d.state); } }
         window.applyState && window.applyState(d.state);
         window.needsRender = true;
-        if(window.render) window.render(); window.needsRender = true; try{ startRenderLoop(); }catch(e){}
-        document.getElementById('roomInfo') && (document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + (roomId||'—'));
+        if(window.render) window.render(); window.needsRender = true; document.getElementById('roomInfo') && (document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + (roomId||'—'));
         if(d.players) window.updateRoomPlayers(d.players);
       }
     } else if(t==='error'){
@@ -101,8 +99,7 @@ catch(e){} }catch(e){}
             window.cam.x = -cap.x;
             window.cam.y = -cap.y;
           }
-          if(window.render) window.render(); window.needsRender = true; try{ startRenderLoop(); }catch(e){}
-        }
+          if(window.render) window.render(); window.needsRender = true; }
       }catch(e){ console.warn('Camera set failed', e); }
 
     } else if(t==='game_over'){
