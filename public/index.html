@@ -61,6 +61,7 @@ button{padding:12px;border-radius:10px;border:none;cursor:pointer;font-weight:70
 
     <div style="margin-top:12px">
       <button id="startBtn" class="green" style="width:100%">ابدأ</button>
+<button id="pingToggle" title="Ping (P)" style="position:absolute;left:55px;top:10px;width:40px;height:40px;background:#a00;color:#fff;font-size:22px;border:none;border-radius:10px;cursor:pointer;font-weight:700">P</button>
     <button id="onlineBtnLocal" class="green" style="width:100%;background:#06b6d4;margin-top:8px">اونلاين (غرف)</button>
     </div>
   </div>
@@ -137,6 +138,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   let W = 0, H = 0;
   let needRender = true;
+  // Expose a global hook so socket-client can request a render safely
+  window.requestRender = function(){ try{ needRender = true; }catch(e){} };
+  // expose render function reference placeholder (will be assigned once render exists)
+  window.render = window.render || null;
   function resize(){ W = gameCanvas.width = window.innerWidth || 300; H = gameCanvas.height = window.innerHeight || 200; lineCanvas.width = W; lineCanvas.height = H; needRender = true; }
   window.addEventListener('resize', resize);
   resize();
@@ -170,17 +175,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
     grid.length = 0;
     const cols = Math.max(8, Math.floor(W / (HEXR() * 1.6)));
     const rows = Math.max(6, Math.floor(H / (HEXR() * 1.25)));
-    // increase horizontal spacing by 25% while keeping grid centered
-    const xSpacing = HEX * 1.7 * 1.25;
-    const startX = -((cols - 1) * xSpacing) / 2;
+    const startX = -cols * HEX * 0.85;
     const startY = -rows * HEX * 0.95;
     for(let r=0;r<rows;r++){
       for(let c=0;c<cols;c++){
-        const x = startX + c * xSpacing + (r % 2 ? HEX * 0.85 : 0);
+        const x = startX + c * HEX * 1.7 + (r % 2 ? HEX * 0.85 : 0);
         const y = startY + r * HEX * 1.45;
         grid.push({ x, y, owner:null, troops:0, neighbors:[] });
-      }
-    }
       }
     }
     for(let i=0;i<grid.length;i++){
@@ -188,7 +189,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
       for(let j=0;j<grid.length;j++){
         if(i===j) continue;
         const b = grid[j];
-        if(Math.hypot(a.x - b.x, a.y - b.y) < xSpacing * 1.05) a.neighbors.push(j);
+        if(Math.hypot(a.x - b.x, a.y - b.y) < HEX * 1.75) a.neighbors.push(j);
       }
     }
     needRender = true;
@@ -222,28 +223,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const cyMin = Math.min(...ys), cyMax = Math.max(...ys);
     const corners = [[cxMin,cyMin],[cxMax,cyMin],[cxMin,cyMax],[cxMax,cyMax]];
 
-    // determine active players: prefer server-provided window.players if exists, otherwise local players
-    const activePlayers = (window.players && window.players.length) ? window.players.filter(p=>p && p.alive) : players.filter(p=>p && p.alive);
-    for(let idx=0; idx<activePlayers.length; idx++){
-      const p = activePlayers[idx];
-      const pt = corners[idx % corners.length];
+    for(let p=0; p<players.length; p++){
+      const pt = corners[p % corners.length];
       let bestIdx=0, bestD=Infinity;
-      for(let i=0;i<grid.length;i++){
+      for(let i=0; i<grid.length; i++){
         const d = Math.hypot(grid[i].x - pt[0], grid[i].y - pt[1]);
         if(d < bestD){ bestD = d; bestIdx = i; }
       }
-      // assign owner using player id/index if available
-      const ownerId = (p && (typeof p.id !== 'undefined')) ? p.id : p.index;
-      grid[bestIdx].owner = ownerId;
+      grid[bestIdx].owner = players[p].id;
       grid[bestIdx].troops = 40;
-      // set capital on player object if possible
-      if(window.players && window.players.length){
-        const wp = window.players.find(x=>x.index===ownerId || x.id===ownerId);
-        if(wp) wp.capital = bestIdx;
-      } else {
-        const lp = players.find(x=>x.id===ownerId || x.index===ownerId);
-        if(lp) lp.capital = bestIdx;
-      }
+      players[p].capital = bestIdx;
     }
     needRender = true;
   }
@@ -390,6 +379,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
     for(const p of players){ if(!p || p.capital==null || !p.alive) continue; const capIdx = p.capital; const cap = grid[capIdx]; if(!cap) continue; let danger=false; for(let i=0;i<grid.length;i++){ const cell = grid[i]; if(cell.owner != null && cell.owner !== p.id){ const d = Math.hypot(cell.x - cap.x, cell.y - cap.y); if(d < DEFEND_RADIUS){ danger=true; break; } } } if(danger){ const s = worldToScreen(cap.x, cap.y); const blink = 0.5 + 0.5 * Math.sin(now * 0.015); ctx.save(); ctx.translate(s.x, s.y - (HEX * cam.scale + 18 * cam.scale)); ctx.scale(cam.scale, cam.scale); ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(7, 8); ctx.lineTo(-7, 8); ctx.closePath(); ctx.fillStyle = 'rgba(255,80,80,'+blink+')'; ctx.fill(); ctx.restore(); } }
     needRender = false;
   }
+  // expose render to external scripts
+  window.render = render;
+
 
   function updateLegend(){ if(!legendEl) return; legendEl.innerHTML = ''; for(const p of players){ const div = document.createElement('div'); div.className = 'legend-item'; div.innerHTML = `<div style="width:14px;height:10px;background:${p.color};border-radius:4px"></div><div style="font-size:13px">${p.name}</div>`; legendEl.appendChild(div); } }
 
@@ -587,7 +579,7 @@ window.applyState = function(state){
     }
 
     // render quickly
-    if(typeof window.needRender !== 'undefined') window.needRender = true;
+    if(window.requestRender) window.requestRender(); else if(typeof window.needRender !== 'undefined') window.needRender = true;
   }catch(e){
     console.error('applyState error', e);
   }
@@ -631,19 +623,70 @@ window.startOnlineGame = function(state){
       }
     }catch(e){ console.warn('camera set failed', e); }
 
-    if(typeof window.needRender !== 'undefined') window.needRender = true;
+    if(window.requestRender) window.requestRender(); else if(typeof window.needRender !== 'undefined') window.needRender = true;
   }catch(e){
     console.error('startOnlineGame error', e);
   }
 };
 
 
-function continuousRenderLoop(){
-    try{ if(window.render) window.render(); }catch(e){}
-    requestAnimationFrame(continuousRenderLoop);
-}
-requestAnimationFrame(continuousRenderLoop);
 
+</script>
+
+
+<script>
+// Auto-start online game without requiring touch
+document.addEventListener("DOMContentLoaded", ()=>{
+    try{
+        if(window.isInRoom){
+            window.gameStarted = true;
+            if(window.startOnlineGame && window.lastStateFromServer){
+                window.startOnlineGame(window.lastStateFromServer);
+            }
+            if(window.render) window.render();
+        }
+    }catch(e){ console.warn(e); }
+});
+</script>
+
+
+<script>
+let pingOn=false;
+let lastPing=0;
+let pingInterval=null;
+const pingBtn=document.getElementById("pingToggle");
+const pingDiv=document.getElementById("pingDisplay");
+
+pingBtn.onclick=()=>{
+ pingOn=!pingOn;
+ if(pingOn){
+   pingBtn.style.background="#0a0";
+   pingDiv.style.display="block";
+   if(window.socket){
+     pingInterval=setInterval(()=>{
+       try{
+         const t=Date.now();
+         window.socket.send(JSON.stringify({type:"ping", t}));
+       }catch(e){}
+     },1000);
+   }
+ } else {
+   pingBtn.style.background="#a00";
+   pingDiv.style.display="none";
+   clearInterval(pingInterval);
+ }
+};
+
+if(window.socket){
+ window.socket.addEventListener("message", ev=>{
+   try{
+     const d=JSON.parse(ev.data);
+     if(d.type==="pong"){
+       pingDiv.textContent=(Date.now()-d.t)+" ms";
+     }
+   }catch(e){}
+ });
+}
 </script>
 
 </body>
