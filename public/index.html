@@ -544,97 +544,33 @@ window._debugLog = debugLog;
 window.applyState = function(state){
   try{
     if(!state) return;
-    // Accept multiple state shapes: {grid: [...]}, {cells: [...]}, or direct array
-    var serverGrid = null;
-    if(Array.isArray(state.grid)) serverGrid = state.grid;
-    else if(Array.isArray(state.cells)) serverGrid = state.cells;
-    else if(Array.isArray(state)) serverGrid = state;
-    // Merge server grid into client grid to preserve positions/neighbors calculated client-side
-    if(serverGrid && Array.isArray(window.grid) && window.grid.length === serverGrid.length){
-      for(var i=0;i<serverGrid.length;i++){
-        try{
-          var s = serverGrid[i];
-          var g = window.grid[i];
-          if(!g) continue;
-          // prefer numeric troops/owner from server if present
-          if(typeof s.troops !== 'undefined') g.troops = s.troops;
-          if(typeof s.owner !== 'undefined') g.owner = s.owner;
-          // copy neighbors if client missing them (but prefer client's)
-          if((!g.neighbors || g.neighbors.length===0) && Array.isArray(s.neighbors)) g.neighbors = s.neighbors.slice();
-          // copy coordinates if client missing them
-          if((typeof g.x === 'undefined' || typeof g.y === 'undefined') && typeof s.x !== 'undefined' && typeof s.y !== 'undefined'){
-            g.x = s.x; g.y = s.y;
-          }
-        }catch(e){}
-      }
-    } else if(serverGrid && Array.isArray(serverGrid)){
-      // If sizes differ, try to preserve positions by matching by x,y (within tolerance), otherwise replace
-      if(Array.isArray(window.grid) && window.grid.length>0){
-        var used = new Array(serverGrid.length);
-        for(var i=0;i<window.grid.length;i++){
-          var bestIdx = -1;
-          var bestD = Infinity;
-          var gx = window.grid[i].x, gy = window.grid[i].y;
-          for(var j=0;j<serverGrid.length;j++){
-            if(used[j]) continue;
-            var s = serverGrid[j];
-            if(typeof s.x === 'undefined') continue;
-            var d = Math.hypot(gx - s.x, gy - s.y);
-            if(d < bestD){ bestD = d; bestIdx = j; }
-          }
-          if(bestIdx !== -1 && bestD < 1.0){
-            used[bestIdx] = true;
-            var s = serverGrid[bestIdx];
-            window.grid[i].owner = (typeof s.owner !== 'undefined') ? s.owner : window.grid[i].owner;
-            window.grid[i].troops = (typeof s.troops !== 'undefined') ? s.troops : window.grid[i].troops;
-          }
-        }
-        // apply remaining server cells by appending if needed
-        for(var k=0;k<serverGrid.length;k++){
-          if(!used[k]){
-            var s = serverGrid[k];
-            window.grid.push({
-              x: s.x || 0,
-              y: s.y || 0,
-              owner: (typeof s.owner !== 'undefined') ? s.owner : null,
-              troops: (typeof s.troops !== 'undefined') ? s.troops : 0,
-              neighbors: Array.isArray(s.neighbors) ? s.neighbors.slice() : []
-            });
-          }
-        }
-      } else {
-        // no client grid: adopt server grid but ensure neighbor arrays exist
-        window.grid = serverGrid.map(function(c){
-          return {
-            x: (typeof c.x !== 'undefined') ? c.x : 0,
-            y: (typeof c.y !== 'undefined') ? c.y : 0,
-            owner: (typeof c.owner !== 'undefined') ? c.owner : null,
-            troops: (typeof c.troops !== 'undefined') ? c.troops : 0,
-            neighbors: Array.isArray(c.neighbors) ? c.neighbors.slice() : []
-          };
-        });
-      }
+    if(state.grid && Array.isArray(state.grid)){
+      window.grid = state.grid;
     }
-    // players mapping (robust)
     if(state.players && Array.isArray(state.players)){
-      window.players = state.players.map(function(p){
+      // server provides canonical players array (including color)
+      window.players = state.players.map(p=>{
+        // ensure defaults
         return {
-          id: (typeof p.index !== 'undefined') ? p.index : (typeof p.id !== 'undefined' ? p.id : null),
-          index: (typeof p.index !== 'undefined') ? p.index : (typeof p.id !== 'undefined' ? p.id : null),
-          name: p.name || ('P'+(((typeof p.index !== 'undefined') ? p.index : (typeof p.id !== 'undefined' ? p.id : 0))+1)),
+          id: p.index,
+          index: p.index,
+          name: p.name || ('P'+(p.index+1)),
           color: p.color || '#999999',
-          capital: (typeof p.capital !== 'undefined') ? p.capital : null,
-          alive: (typeof p.alive !== 'undefined') ? !!p.alive : true,
+          capital: (typeof p.capital!=='undefined') ? p.capital : null,
+          alive: (typeof p.alive!=='undefined') ? Boolean(p.alive) : true,
           isHost: !!p.isHost
         };
       });
     }
-    // update UI
-    try{ if(typeof updateLegend === 'function') updateLegend(); }catch(e){}
-    try{ if(typeof window.updateRoomPlayers === 'function') window.updateRoomPlayers(window.players.map(function(p){ return { index:p.index, name:p.name, isHost:p.isHost, color:p.color, capital:p.capital, alive:p.alive }; })); }catch(e){}
-    // mark for render and call immediate render
-    window.needRender = true;
-    try{ if(window.render) window.render(); }catch(e){}
+
+    // update local UI
+    if(typeof updateLegend === 'function') try{ updateLegend(); }catch(e){}
+    if(typeof window.updateRoomPlayers === 'function'){
+      try{ window.updateRoomPlayers(window.players.map(p=>({index:p.index,name:p.name,isHost:p.isHost,color:p.color,capital:p.capital,alive:p.alive}))); }catch(e){}
+    }
+
+    // render quickly
+    if(typeof window.needRender !== 'undefined') window.needRender = true;
   }catch(e){
     console.error('applyState error', e);
   }
@@ -694,6 +630,20 @@ requestAnimationFrame(continuousRenderLoop);
 </script>
 
 
-<script>try{ if(typeof applyState !== 'undefined') window.applyState = applyState; if(typeof render !== 'undefined') window.render = render; if(typeof updateRoomPlayers !== 'undefined') window.updateRoomPlayers = updateRoomPlayers; }catch(e){}</script>
+<script>
+// Auto-start online game without requiring touch
+document.addEventListener("DOMContentLoaded", ()=>{
+    try{
+        if(window.isInRoom){
+            window.gameStarted = true;
+            if(window.startOnlineGame && window.lastStateFromServer){
+                window.startOnlineGame(window.lastStateFromServer);
+            }
+            if(window.render) window.render();
+        }
+    }catch(e){ console.warn(e); }
+});
+</script>
+
 </body>
 </html>
