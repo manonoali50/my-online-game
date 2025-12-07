@@ -60,7 +60,10 @@ function moveTroopsServer(grid, playersArr, fromIdx, toIdx, ratio){
   f.troops = Math.max(0, f.troops - send);
   if(t.owner === f.owner){ t.troops += send; }
   else {
-    if(send > t.troops){
+    let required = t.troops;
+ if(players && players[f.owner] && players[f.owner].capital===toIdx){}
+ if(players && players[t.owner] && players[t.owner].capital===toIdx){ required = Math.floor(t.troops*1.5); }
+ if(send > required){
       const defeatedOwner = t.owner;
       t.owner = f.owner;
       t.troops = send - t.troops;
