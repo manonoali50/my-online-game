@@ -62,6 +62,14 @@
         document.getElementById('roomInfo') && (document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + (roomId||'—'));
         if(d.players) window.updateRoomPlayers(d.players);
       }
+    } else if(t==='update'){
+      if(d && d.changes){
+        // apply delta updates if the page provides a handler
+        try{
+          if(window.applyDelta) window.applyDelta({ changes: d.changes, players: d.players });
+          if(window.requestRender) window.requestRender();
+        }catch(e){ console.warn('applyDelta failed', e); }
+      }
     } else if(t==='error'){
       alert('خطأ: ' + (d && d.message));
     } else if(t==='game_started'){ waitingForStart = true; window._debugLog && window._debugLog('game_started received'); } else if(t==='host_grid_received'){
