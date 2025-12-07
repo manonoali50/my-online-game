@@ -792,11 +792,11 @@ function updateLeaderboard(){
     return {name:p.name,color:p.color,owned,troops,alive:p.alive};
   }).sort((a,b)=>b.owned - a.owned);
 
-  lb.innerHTML = stats.map(s=>`
+  lb.innerHTML = stats.map((s,i)=>`
     <div class="lb-item" style="opacity:${s.alive?1:.4}">
       <div class="lb-top">
         <div class="lb-color" style="background:${s.color}"></div>
-        <div class="lb-name">${s.name}</div>
+        <div class="lb-name">${i===0 ? "👑 " : ""}${s.name}</div>
       </div>
       <div class="lb-stats">
         خلايا: ${s.owned} | الجنود: ${s.troops}
