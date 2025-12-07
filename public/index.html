@@ -574,7 +574,9 @@ window.applyState = function(state){
           isHost: !!p.isHost
         };
       });
-    }
+    
+    try{ players = (window.players||[]).map(p=>({ id:p.index, index:p.index, name:p.name, color:p.color, capital:p.capital, alive:!!p.alive })); if(typeof updateLegend === 'function') updateLegend(); }catch(e){console.warn('sync players failed',e);} 
+}
 
     // update local UI
     if(typeof updateLegend === 'function') try{ updateLegend(); }catch(e){}
@@ -601,6 +603,8 @@ window.startOnlineGame = function(state){
         id: p.index, index: p.index, name: p.name || ('P'+(p.index+1)), color:p.color || '#999', capital:p.capital||null, alive:!!p.alive, isHost:!!p.isHost
       }));
     }
+    try{ players = (window.players||[]).map(p=>({ id:p.index, index:p.index, name:p.name, color:p.color, capital:p.capital, alive:!!p.alive })); if(typeof updateLegend === 'function') updateLegend(); }catch(e){console.warn('sync players failed',e);} 
+
     // stop local bots and production
     if(window.botTimer) { clearInterval(window.botTimer); window.botTimer = null; }
     if(window.prodTimer) { clearInterval(window.prodTimer); window.prodTimer = null; }
