@@ -12,6 +12,44 @@ const wss = new WebSocket.Server({ server, path: '/ws' });
 const HEX = 34;
 const colorPool = ['#ff5555','#3399ff','#00c48c','#ffe047'];
 
+
+// --- Added validation helpers to protect against corrupted grids ---
+function isFiniteNumber(n){
+  return typeof n === 'number' && isFinite(n) && Math.abs(n) < 1e7;
+}
+function validateCell(c){
+  if(!c || typeof c !== 'object') return false;
+  if(!isFiniteNumber(c.x) || !isFiniteNumber(c.y)) return false;
+  if(!('troops' in c) || typeof c.troops !== 'number' || !isFinite(c.troops) || c.troops < 0 || c.troops > 1e6) return false;
+  if(!('neighbors' in c) || !Array.isArray(c.neighbors)) return false;
+  if(c.neighbors.length > 20) return false;
+  if(c.owner !== null && (typeof c.owner !== 'number' || !Number.isInteger(c.owner) || c.owner < 0 || c.owner > 1000)) return false;
+  return true;
+}
+function validateGrid(grid){
+  if(!Array.isArray(grid)) return false;
+  if(grid.length < 20 || grid.length > 4000) return false;
+  for(let i=0;i<grid.length;i++){
+    if(!validateCell(grid[i])) return false;
+  }
+  return true;
+}
+
+function ensureValidRoomGrid(room){
+  try{
+    if(!validateGrid(room.grid)){
+      console.warn('Invalid grid detected for room', room.id, '— rebuilding grid to safe defaults.');
+      room.grid = buildGridForServer(Math.max(8,10), Math.max(6,8));
+      const playersArr = room.players.map(p=>({ws:p.ws, index:p.index, capital:p.capital||null, alive:true}));
+      seedCapitalsForPlayers(room.grid, playersArr);
+      for(const pa of playersArr){
+        const rp = room.players.find(p=>p.index===pa.index);
+        if(rp) rp.capital = pa.capital;
+      }
+    }
+  }catch(e){ console.warn('ensureValidRoomGrid failed', e); }
+}
+
 function buildGridForServer(cols = 10, rows = 8){
   const grid = [];
   const startX = -cols * HEX * 0.85;
@@ -142,9 +180,16 @@ function handleMessage(ws, msg){
     const room = rooms[d.roomId];
     if(!room) { ws.send(JSON.stringify({t:'error', d:{message:'الغرفة غير موجودة'}})); return; }
     if(d.grid && Array.isArray(d.grid) && d.grid.length>0){
-      room.grid = d.grid;
+      if(validateGrid(d.grid)){
+        room.grid = d.grid;
+      } else {
+        console.warn('Rejected invalid host_grid from client for room', room.id);
+        ws.send(JSON.stringify({t:'error', d:{message:'invalid_grid'}}));
+        return;
+      }
     }
     if(d.players && Array.isArray(d.players)){
+
       for(const pd of d.players){
         const rp = room.players.find(p=>p.index===pd.index);
         if(rp){
@@ -174,6 +219,7 @@ function handleMessage(ws, msg){
     // broadcast players (include color)
     const playersForState = room.players.map(p=>({ index:p.index, name:p.name, isHost:(room.host===p.index), capital:p.capital, alive:p.alive, color:p.color }));
     room.prodTimer = setInterval(()=>{
+      ensureValidRoomGrid(room);
       for(const c of room.grid){ if(c.owner != null) c.troops++; }
       // check victory
       const alivePlayers = room.players.filter(p=>p.alive);
@@ -186,7 +232,8 @@ function handleMessage(ws, msg){
         return;
       }
       broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: playersForState } } });
-    }, Math.max(50, (d.prodRate||900)));
+    }, Math.max(50, (d.prodRate||100)));
+    ensureValidRoomGrid(room);
     broadcast(room, { t:'game_started', d:{} });
     broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: playersForState } } });
   } else if(t==='action'){
