@@ -729,31 +729,86 @@ if(window.socket){
 </script>
 
 
-<!-- Leaderboard Panel -->
-<div id="leaderboardPanel" style="position:fixed;right:0;top:80px;width:220px;background:rgba(20,26,38,0.85);color:white;border-radius:10px 0 0 10px;padding:6px;z-index:2500;transition:transform .25s">
-  <div id="leaderboardHeader" style="background:rgba(255,255,255,.08);padding:6px;text-align:center;cursor:pointer;font-weight:bold">الترتيب</div>
-  <div id="leaderboardContent" style="max-height:60vh;overflow-y:auto;font-size:13px"></div>
+
+
+
+<style>
+#leaderboardPanel {
+  position: fixed; right: 0; top: 90px;
+  width: 250px;
+  background: rgba(15,18,28,0.92);
+  border-left: 3px solid #3b82f6;
+  border-radius: 12px 0 0 12px;
+  color: white;
+  padding: 10px;
+  z-index: 2600;
+  font-family: Tahoma;
+  box-shadow: 0 0 22px rgba(0,0,0,0.55);
+  backdrop-filter: blur(6px);
+  transform: translateX(270px);
+  transition: transform .25s;
+}
+#leaderboardPanel.open { transform: translateX(0); }
+
+#lbToggleBtn {
+  position:absolute; left:-34px; top:12px;
+  width:32px; height:32px;
+  background:#3b82f6;
+  border-radius:6px 0 0 6px;
+  color:white; font-weight:bold;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer;
+  box-shadow:0 0 12px rgba(59,130,246,0.6);
+}
+
+.lb-item {
+  background:rgba(255,255,255,0.05);
+  padding:8px; border-radius:8px; margin-bottom:6px;
+  display:flex; flex-direction:column;
+}
+.lb-top { display:flex; align-items:center; gap:6px; }
+.lb-color{ width:14px;height:14px;border-radius:4px; }
+.lb-name{ font-size:14px; font-weight:bold; }
+.lb-stats{font-size:12px; opacity:.8; margin-top:3px;}
+</style>
+
+<div id="leaderboardPanel">
+  <div id="lbToggleBtn">≡</div>
+  <h3 style="margin:0 0 10px;text-align:center">🏆 الترتيب</h3>
+  <div id="leaderboardContent"></div>
 </div>
 
 <script>
+let lbOnlineOnly = true;
 function updateLeaderboard(){
+  if(lbOnlineOnly && !window.isOnline) return;
   if(!window.players || !window.grid) return;
+
   const lb=document.getElementById("leaderboardContent");
-  const stats=window.players.map(p=>{
-    const owned=window.grid.filter(c=>c.owner===p.index).length;
-    const troops=window.grid.filter(c=>c.owner===p.index).reduce((a,c)=>a+c.troops,0);
+  const stats = window.players.map(p=>{
+    const owned = window.grid.filter(c=>c.owner===p.index).length;
+    const troops = window.grid.filter(c=>c.owner===p.index)
+        .reduce((a,c)=>a+c.troops,0);
     return {name:p.name,color:p.color,owned,troops,alive:p.alive};
-  }).sort((a,b)=>b.owned-a.owned);
-  lb.innerHTML=stats.map(s=>\`<div style="margin:4px 0;padding:6px;background:rgba(255,255,255,.06);border-radius:6px;opacity:\${s.alive?1:.4}">
-    <div style="display:flex;align-items:center;gap:6px">
-      <div style="width:12px;height:12px;border-radius:3px;background:\${s.color}"></div>
-      <b>\${s.name}</b>
+  }).sort((a,b)=>b.owned - a.owned);
+
+  lb.innerHTML = stats.map(s=>`
+    <div class="lb-item" style="opacity:${s.alive?1:.4}">
+      <div class="lb-top">
+        <div class="lb-color" style="background:${s.color}"></div>
+        <div class="lb-name">${s.name}</div>
+      </div>
+      <div class="lb-stats">
+        خلايا: ${s.owned} | الجنود: ${s.troops}
+      </div>
     </div>
-    <div style="font-size:11px;margin-top:2px">خلايا: \${s.owned} | جنود: \${s.troops}</div>
-  </div>\`).join("");
+  `).join("");
 }
-setInterval(updateLeaderboard,800);
-document.getElementById("leaderboardHeader").onclick=()=>document.getElementById("leaderboardPanel").classList.toggle("closed");
+setInterval(updateLeaderboard,700);
+
+document.getElementById("lbToggleBtn").onclick=()=>{
+  document.getElementById("leaderboardPanel").classList.toggle("open");
+};
 </script>
 
 </body>
