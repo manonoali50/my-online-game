@@ -10,10 +10,32 @@
   let reconnectTimer = null;
   let __renderLoopStarted = false;
 
+  
   function startRenderLoop(){
-    if(__renderLoopStarted) return; __renderLoopStarted = true;
+    if(__renderLoopStarted) return;
+    __renderLoopStarted = true;
+    // target ~60 FPS. Use combination of setTimeout + requestAnimationFrame to reduce rAF suspension on mobile.
+    let last = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     function loop(){
-      try{ if(window.render) window.render(); window.needsRender = true; try{ startRenderLoop(); }catch(e){} }catch(e){}
+      const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      const dt = Math.max(0, now - last);
+      last = now;
+      try{
+        // update animations/effects if page exposes the helper
+        if(typeof window.updateEffectsAndAnimations === 'function') {
+          try{ window.updateEffectsAndAnimations(dt); } catch(e){}
+        }
+        // always call render if available so canvas repaints even without user input
+        if(typeof window.render === 'function') {
+          try{ window.render(); } catch(e){}
+        }
+      }catch(e){}
+      // schedule next frame: setTimeout guards against some mobile throttling; requestAnimationFrame keeps timing aligned.
+      setTimeout(function(){ try{ requestAnimationFrame(loop); }catch(e){ loop(); } }, 16);
+    }
+    try{ requestAnimationFrame(loop); }catch(e){ setTimeout(loop,16); }
+  }
+catch(e){} }catch(e){}
       requestAnimationFrame(loop);
     }
     requestAnimationFrame(loop);
