@@ -780,20 +780,33 @@ if(window.socket){
 
 <script>
 let lbOnlineOnly = true;
+
 function updateLeaderboard(){
   if(lbOnlineOnly && !window.isOnline) return;
   if(!window.players || !window.grid) return;
-
   const lb=document.getElementById("leaderboardContent");
-  const stats = window.players.map(p=>{
-    const owned = window.grid.filter(c=>c.owner===p.index).length;
-    const troops = window.grid.filter(c=>c.owner===p.index)
-        .reduce((a,c)=>a+c.troops,0);
-    return {name:p.name,color:p.color,owned,troops,alive:p.alive};
-  }).sort((a,b)=>b.owned - a.owned);
+
+  // build lookup map by player index (handles id/index inconsistencies)
+  const playerMap = {};
+  window.players.forEach(p=>{
+    const idx = (typeof p.index !== 'undefined') ? p.index : (typeof p.id !== 'undefined' ? p.id : null);
+    if(idx !== null) playerMap[idx] = p;
+  });
+
+  // build stats array using playerMap keys to ensure colors match actual players
+  const stats = Object.keys(playerMap).map(k=>{
+    const pi = parseInt(k,10);
+    const p = playerMap[pi];
+    const owned = window.grid.filter(c=>c.owner===pi).length;
+    const troops = window.grid.filter(c=>c.owner===pi).reduce((a,c)=>a + (c.troops||0), 0);
+    return {index:pi, name: p.name||('P'+(pi+1)), color: p.color||'#999999', owned, troops, alive: !!p.alive};
+  }).sort((a,b)=> {
+    if(b.owned !== a.owned) return b.owned - a.owned;
+    return b.troops - a.troops;
+  });
 
   lb.innerHTML = stats.map((s,i)=>`
-    <div class="lb-item" style="opacity:${s.alive?1:.4}">
+    <div class="lb-item" style="opacity:${s.alive?1:.45}">
       <div class="lb-top">
         <div class="lb-color" style="background:${s.color}"></div>
         <div class="lb-name">${i===0 ? "👑 " : ""}${s.name}</div>
@@ -805,6 +818,7 @@ function updateLeaderboard(){
   `).join("");
 }
 setInterval(updateLeaderboard,700);
+
 
 document.getElementById("lbToggleBtn").onclick=()=>{
   document.getElementById("leaderboardPanel").classList.toggle("open");
