@@ -143,6 +143,7 @@ function handleMessage(ws, msg){
   } else if(t==='join_room'){
     const room = rooms[d.roomId];
     if(!room){ ws.send(JSON.stringify({t:'error', d:{message:'الغرفة غير موجودة'}})); return; }
+    if(room.players.some(p=>p.ws===ws)){ ws.send(JSON.stringify({t:'error',d:{message:'أنت موجود مسبقاً في الغرفة'}})); return; }
     if(room.players.length >= room.maxPlayers){ ws.send(JSON.stringify({t:'error', d:{message:'الغرفة ممتلئة'}})); return; }
     const idx = getNextIndexForRoom(room);
     // assign next available random color (non-repeating)
@@ -174,6 +175,10 @@ function handleMessage(ws, msg){
     }
     ws.send(JSON.stringify({t:'host_grid_received', d:{ roomId: room.id }}));
   } else if(t==='start_game'){
+    const r=rooms[d.roomId]; if(!r) return;
+    const requester=r.players.find(p=>p.ws===ws);
+    if(!requester || requester.index!==r.host){ ws.send(JSON.stringify({t:'error',d:{message:'فقط المالك يمكنه بدء اللعبة'}})); return; }
+
     const room = rooms[d.roomId]; if(!room) return;
     // always reset previous running state and grid (unless host provided a grid earlier)
     room.running = true;
