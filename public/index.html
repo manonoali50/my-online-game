@@ -31,6 +31,7 @@ button{padding:12px;border-radius:10px;border:none;cursor:pointer;font-weight:70
 </style>
 </head>
 <body>
+<div id="pingDisplay" style="position:absolute;top:10px;right:10px;color:white;font-size:18px;display:none;">0 ms</div>
 
 <canvas id="game"></canvas>
 <canvas id="lineLayer" style="position:fixed;inset:0;pointer-events:none;z-index:1700"></canvas>
@@ -60,6 +61,7 @@ button{padding:12px;border-radius:10px;border:none;cursor:pointer;font-weight:70
 
     <div style="margin-top:12px">
       <button id="startBtn" class="green" style="width:100%">ابدأ</button>
+<button id="pingToggle" title="Ping (P)" style="position:absolute;left:55px;top:10px;width:40px;height:40px;background:#a00;color:#fff;font-size:22px;border:none;border-radius:10px;cursor:pointer;font-weight:700">P</button>
     <button id="onlineBtnLocal" class="green" style="width:100%;background:#06b6d4;margin-top:8px">اونلاين (غرف)</button>
     </div>
   </div>
@@ -645,6 +647,46 @@ document.addEventListener("DOMContentLoaded", ()=>{
         }
     }catch(e){ console.warn(e); }
 });
+</script>
+
+
+<script>
+let pingOn=false;
+let lastPing=0;
+let pingInterval=null;
+const pingBtn=document.getElementById("pingToggle");
+const pingDiv=document.getElementById("pingDisplay");
+
+pingBtn.onclick=()=>{
+ pingOn=!pingOn;
+ if(pingOn){
+   pingBtn.style.background="#0a0";
+   pingDiv.style.display="block";
+   if(window.socket){
+     pingInterval=setInterval(()=>{
+       try{
+         const t=Date.now();
+         window.socket.send(JSON.stringify({type:"ping", t}));
+       }catch(e){}
+     },1000);
+   }
+ } else {
+   pingBtn.style.background="#a00";
+   pingDiv.style.display="none";
+   clearInterval(pingInterval);
+ }
+};
+
+if(window.socket){
+ window.socket.addEventListener("message", ev=>{
+   try{
+     const d=JSON.parse(ev.data);
+     if(d.type==="pong"){
+       pingDiv.textContent=(Date.now()-d.t)+" ms";
+     }
+   }catch(e){}
+ });
+}
 </script>
 
 </body>
