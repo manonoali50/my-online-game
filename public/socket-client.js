@@ -46,7 +46,7 @@
       if(d && d.players) window.updateRoomPlayers(d.players);
     } else if(t==='state'){
       if(d && d.state){
-        if (waitingForStart) { waitingForStart = false; window._debugLog && window._debugLog('game_started -> state'); try{ if(window.startOnlineGame){ window.startOnlineGame(d.state); } } catch(err){ window._debugLog && window._debugLog('startOnlineGame threw: '+err); try{ window.isInRoom=true; const lobby=document.getElementById('lobby'); if(lobby) lobby.style.display='none'; }catch(e){} } } }
+        if(waitingForStart){ waitingForStart = false; window._debugLog && window._debugLog('Starting online game from state'); if(window.startOnlineGame){ window.startOnlineGame(d.state); } }
         window.applyState && window.applyState(d.state);
         document.getElementById('roomInfo') && (document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + (roomId||'—'));
         if(d.players) window.updateRoomPlayers(d.players);
@@ -71,15 +71,13 @@
     }
   }
 
-  
-window.socketClient = {
+  window.socketClient = {
     createRoom(opts){ send('create_room', opts || {}); },
     joinRoom(opts){ send('join_room', opts || {}); },
-    leaveRoom(){ send('leave_room', {roomId}); roomId=null; playerIndex=null; isHost=false; window.isInRoom=false; const leaveBtn = document.getElementById('leaveRoomBtn'); if(leaveBtn) leaveBtn.style.display = 'none'; },
+    leaveRoom(){ send('leave_room', {roomId}); roomId=null; playerIndex=null; isHost=false; window.isInRoom=false; const leaveBtn = document.getElementById('leaveRoomBtn'); if(leaveBtn) leaveBtn.style.display='none'; },
     sendAction(action){ send('action', { action, roomId }); },
-    startGame(opts){
+    startGame(opts){ 
       if(isHost && window.grid && window.grid.length){
-        // send current grid and players to host before starting
         send('host_grid', { roomId, grid: window.grid, players: (window.players || []).map(p=>({ index: p.index, capital: p.capital, name: p.name })) });
         setTimeout(()=> send('start_game', { roomId, prodRate: (opts && opts.prodRate) || 900 }), 150);
       } else {
