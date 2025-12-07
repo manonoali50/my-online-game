@@ -12,68 +12,6 @@ const wss = new WebSocket.Server({ server, path: '/ws' });
 const HEX = 34;
 const colorPool = ['#ff5555','#3399ff','#00c48c','#ffe047'];
 
-
-// --- Added validation helpers to protect against corrupted grids ---
-function isFiniteNumber(n){
-  return typeof n === 'number' && isFinite(n) && Math.abs(n) < 1e7;
-}
-function validateCell(c){
-  if(!c || typeof c !== 'object') return false;
-  if(!isFiniteNumber(c.x) || !isFiniteNumber(c.y)) return false;
-  if(!('troops' in c) || typeof c.troops !== 'number' || !isFinite(c.troops) || c.troops < 0 || c.troops > 1e6) return false;
-  if(!('neighbors' in c) || !Array.isArray(c.neighbors)) return false;
-  if(c.neighbors.length > 20) return false;
-  if(c.owner !== null && (typeof c.owner !== 'number' || !Number.isInteger(c.owner) || c.owner < 0 || c.owner > 1000)) return false;
-  return true;
-}
-function validateGrid(grid){
-  if(!Array.isArray(grid)) return false;
-  if(grid.length < 20 || grid.length > 4000) return false;
-  for(let i=0;i<grid.length;i++){
-    if(!validateCell(grid[i])) return false;
-  }
-  return true;
-}
-
-function ensureValidRoomGrid(room){
-  try{
-    if(!validateGrid(room.grid)){
-      console.warn('Invalid grid detected for room', room.id, '— rebuilding grid to safe defaults.');
-      room.grid = buildGridForServer(Math.max(8,10), Math.max(6,8));
-      const playersArr = room.players.map(p=>({ws:p.ws, index:p.index, capital:p.capital||null, alive:true}));
-      seedCapitalsForPlayers(room.grid, playersArr);
-      for(const pa of playersArr){
-        const rp = room.players.find(p=>p.index===pa.index);
-        if(rp) rp.capital = pa.capital;
-      }
-
-
-function clampNumber(v, minV, maxV){ if(typeof v !== 'number' || !isFinite(v)) return minV; return Math.max(minV, Math.min(maxV, v)); }
-
-function sanitizeCellForSend(cell){
-  return {
-    x: clampNumber(cell.x, -1e6, 1e6),
-    y: clampNumber(cell.y, -1e6, 1e6),
-    owner: (cell.owner === null ? null : (Number.isInteger(cell.owner) ? cell.owner : null)),
-    troops: clampNumber(Math.floor(Number(cell.troops) || 0), 0, 1000000),
-    neighbors: Array.isArray(cell.neighbors) ? cell.neighbors.filter(n=>Number.isInteger(n) && n>=0 && n<10000).slice(0,40) : []
-  };
-}
-
-function sanitizeState(room){
-  try{
-    const safeGrid = room.grid.map(sanitizeCellForSend);
-    const safePlayers = room.players.map(p=>({ index: p.index, name: p.name||('P'+(p.index+1)), isHost: (room.host===p.index), capital: (typeof p.capital==='number' ? p.capital : null), alive: !!p.alive, color: p.color||'#999' }));
-    return { grid: safeGrid, players: safePlayers };
-  }catch(e){
-    console.warn('sanitizeState failed', e);
-    return { grid: buildGridForServer(Math.max(8,10), Math.max(6,8)).map(sanitizeCellForSend), players: room.players.map(p=>({ index: p.index, name: p.name||('P'+(p.index+1)), isHost: (room.host===p.index), capital: null, alive: !!p.alive, color: p.color||'#999' })) };
-  }
-}
-    }
-  }catch(e){ console.warn('ensureValidRoomGrid failed', e); }
-}
-
 function buildGridForServer(cols = 10, rows = 8){
   const grid = [];
   const startX = -cols * HEX * 0.85;
@@ -141,6 +79,20 @@ function moveTroopsServer(grid, playersArr, fromIdx, toIdx, ratio){
 
 const rooms = {};
 
+function getNextIndexForRoom(room){
+  const used = new Set(room.players.map(p=>p.index));
+  let i = 0;
+  while(used.has(i)) i++;
+  return i;
+}
+
+function pickRandomAvailableColor(room){
+  const used = new Set(room.players.map(p=>p.color));
+  const available = colorPool.filter(c => !used.has(c));
+  if(available.length === 0) return colorPool[Math.floor(Math.random()*colorPool.length)];
+  return available[Math.floor(Math.random()*available.length)];
+}
+
 wss.on('connection', function connection(ws){
   ws.id = uuidv4();
   ws.on('message', function incoming(message){
@@ -155,10 +107,13 @@ wss.on('connection', function connection(ws){
       const idx = room.players.findIndex(p=>p.ws === ws);
       if(idx!==-1){
         const left = room.players.splice(idx,1)[0];
+        // notify remaining players
         broadcast(room, { t:'player_left', d:{index:left.index, players:room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),color:p.color}))} });
+        // if host left, pick new host (first player in array)
         if(room.host === left.index){
           if(room.players.length>0){ room.host = room.players[0].index; broadcast(room,{t:'host_changed', d:{host:room.host}}); }
         }
+        // if no players, cleanup room
         if(room.players.length===0){
           if(room.prodTimer) clearInterval(room.prodTimer);
           delete rooms[rid];
@@ -178,18 +133,20 @@ function handleMessage(ws, msg){
     const defaultRows = Math.max(6, d.rows || 8);
     const room = { id: roomId, players: [], host: null, maxPlayers, grid: buildGridForServer(defaultCols, defaultRows), prodTimer:null, running:false };
     rooms[roomId] = room;
-    const player = { ws, index: 0, name: d.name || ('P1'), alive:true, capital:null, color: colorPool[0 % colorPool.length] };
-    room.players.push(player); room.host = player.index;
-    ws.send(JSON.stringify({ t:'room_created', d:{ roomId, playerIndex:player.index, isHost:true, players: room.players.map(p=>({index:p.index,name:p.name,isHost:true,color:p.color})) } }));
+    // determine index and color
+    const idx = getNextIndexForRoom(room);
+    const color = pickRandomAvailableColor(room);
+    const player = { ws, index: idx, name: d.name || ('P'+(idx+1)), alive:true, capital:null, color: color };
+    room.players.push(player);
+    room.host = player.index;
+    ws.send(JSON.stringify({ t:'room_created', d:{ roomId, playerIndex:player.index, isHost:true, players: room.players.map(p=>({index:p.index,name:p.name,isHost:(room.host===p.index),color:p.color})) } }));
   } else if(t==='join_room'){
     const room = rooms[d.roomId];
     if(!room){ ws.send(JSON.stringify({t:'error', d:{message:'الغرفة غير موجودة'}})); return; }
     if(room.players.length >= room.maxPlayers){ ws.send(JSON.stringify({t:'error', d:{message:'الغرفة ممتلئة'}})); return; }
-    const idx = room.players.length;
-    // assign next available color (non-repeating)
-    const used = new Set(room.players.map(p=>p.color));
-    let color = colorPool[idx % colorPool.length];
-    for(const c of colorPool){ if(!used.has(c)){ color=c; break; } }
+    const idx = getNextIndexForRoom(room);
+    // assign next available random color (non-repeating)
+    const color = pickRandomAvailableColor(room);
     const player = { ws, index: idx, name: 'P'+(idx+1), alive:true, capital:null, color };
     room.players.push(player);
     // notify joining player
@@ -204,16 +161,9 @@ function handleMessage(ws, msg){
     const room = rooms[d.roomId];
     if(!room) { ws.send(JSON.stringify({t:'error', d:{message:'الغرفة غير موجودة'}})); return; }
     if(d.grid && Array.isArray(d.grid) && d.grid.length>0){
-      if(validateGrid(d.grid)){
-        room.grid = d.grid;
-      } else {
-        console.warn('Rejected invalid host_grid from client for room', room.id);
-        ws.send(JSON.stringify({t:'error', d:{message:'invalid_grid'}}));
-        return;
-      }
+      room.grid = d.grid;
     }
     if(d.players && Array.isArray(d.players)){
-
       for(const pd of d.players){
         const rp = room.players.find(p=>p.index===pd.index);
         if(rp){
@@ -242,8 +192,8 @@ function handleMessage(ws, msg){
     }
     // broadcast players (include color)
     const playersForState = room.players.map(p=>({ index:p.index, name:p.name, isHost:(room.host===p.index), capital:p.capital, alive:p.alive, color:p.color }));
+    if(room.prodTimer) clearInterval(room.prodTimer);
     room.prodTimer = setInterval(()=>{
-      ensureValidRoomGrid(room);
       for(const c of room.grid){ if(c.owner != null) c.troops++; }
       // check victory
       const alivePlayers = room.players.filter(p=>p.alive);
@@ -252,18 +202,14 @@ function handleMessage(ws, msg){
         clearInterval(room.prodTimer);
         room.running = false;
         const winner = alivePlayers.length===1 ? alivePlayers[0].index : null;
-        const __safe_state = sanitizeState(room);
-        broadcast(room, { t:'game_over', d:{ winner, winnerName: winner!=null ? alivePlayers[0].name : null, state: __safe_state } });
+        broadcast(room, { t:'game_over', d:{ winner, winnerName: winner!=null ? alivePlayers[0].name : null, state:{ grid: room.grid, players: playersForState } } });
         return;
       }
-      const __safe_state = sanitizeState(room);
-    broadcast(room, { t:'state', d:{ state: __safe_state } });
-    }, Math.max(50, (d.prodRate||100)));
-    ensureValidRoomGrid(room);
+      broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: playersForState } } });
+    }, Math.max(50, (d.prodRate||200)));
     broadcast(room, { t:'game_started', d:{} });
-    const __safe_state = sanitizeState(room);
-    broadcast(room, { t:'state', d:{ state: __safe_state } });
-    } else if(t==='action'){
+    broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: playersForState } } });
+  } else if(t==='action'){
     const room = findRoomByWs(ws);
     if(!room) return;
     const action = d.action;
@@ -271,16 +217,14 @@ function handleMessage(ws, msg){
       moveTroopsServer(room.grid, room.players, action.from, action.to, action.ratio);
       // prepare players for state with color field
       const playersForState = room.players.map(p=>({ index:p.index, name:p.name, isHost:(room.host===p.index), capital:p.capital, alive:p.alive, color:p.color }));
-      const __safe_state = sanitizeState(room);
-    broadcast(room, { t:'state', d:{ state: __safe_state } });
-    // after move check victory
+      broadcast(room, { t:'state', d:{ state: { grid: room.grid, players: playersForState } } });
+      // after move check victory
       const alivePlayers = room.players.filter(p=>p.alive);
       if(alivePlayers.length <= 1){
         if(room.prodTimer) clearInterval(room.prodTimer);
         room.running = false;
         const winner = alivePlayers.length===1 ? alivePlayers[0].index : null;
-        const __safe_state = sanitizeState(room);
-        broadcast(room, { t:'game_over', d:{ winner, winnerName: winner!=null ? alivePlayers[0].name : null, state: __safe_state } });
+        broadcast(room, { t:'game_over', d:{ winner, winnerName: winner!=null ? alivePlayers[0].name : null, state:{ grid: room.grid, players: playersForState } } });
       }
     }
   }
