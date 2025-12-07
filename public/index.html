@@ -398,13 +398,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
       if(idx !== selected && isNeighbor(selected, idx)){
         const ratio = ratioSlider ? parseInt(ratioSlider.value,10)/100 : 0.5;
         if(window.isInRoom && window.socketClient){
-          // optimistic local update for smoothness
+          // In online mode we use server-authoritative updates.
+          // Send the action to server and wait for the server state to update the game.
           try{
-            moveTroops(selected, idx, ratio);
-            // send action to server
             window.socketClient.sendAction({ type:'move', from:selected, to:idx, ratio });
           }catch(e){ console.warn('online move failed', e); }
         } else {
+          // offline/local mode: apply move locally
           moveTroops(selected, idx, ratio);
         }
       }
@@ -620,12 +620,6 @@ window.startOnlineGame = function(state){
   }
 };
 
-
-function continuousRenderLoop(){
-    try{ if(window.render) window.render(); }catch(e){}
-    requestAnimationFrame(continuousRenderLoop);
-}
-requestAnimationFrame(continuousRenderLoop);
 
 </script>
 
