@@ -837,9 +837,12 @@ function updateLeaderboard(){
 setInterval(updateLeaderboard,700);
 
 
+
 document.getElementById("lbToggleBtn").onclick=()=>{
-  document.getElementById("leaderboardPanel").classList.toggle("open");
+  const p=document.getElementById("leaderboardPanel");
+  p.style.display = (p.style.display==="block"?"none":"block");
 };
+
 </script>
 
 </body>
