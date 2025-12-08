@@ -56,19 +56,12 @@
         try{  }catch(e){}
 
         if(waitingForStart){ waitingForStart = false; window._debugLog && window._debugLog('Starting online game from state'); if(window.startOnlineGame){ window.startOnlineGame(d.state); } }
-        window.lastStateFromServer = d.state; try{ if(window.applyState) window.applyState(d.state); }catch(e){ console.warn('applyState failed', e); }
+        window.lastStateFromServer = d.state;
+        window.players = d.state.players; try{ if(window.applyState) window.applyState(d.state); }catch(e){ console.warn('applyState failed', e); }
         if(window.requestRender) window.requestRender();
         if(window.render) window.render(); if(window.requestRender) window.requestRender(); try{  }catch(e){}
         document.getElementById('roomInfo') && (document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + (roomId||'—'));
         if(d.players) window.updateRoomPlayers(d.players);
-      }
-    } else if(t==='update'){
-      if(d && d.changes){
-        // apply delta updates if the page provides a handler
-        try{
-          if(window.applyDelta) window.applyDelta({ changes: d.changes, players: d.players });
-          if(window.requestRender) window.requestRender();
-        }catch(e){ console.warn('applyDelta failed', e); }
       }
     } else if(t==='error'){
       alert('خطأ: ' + (d && d.message));
