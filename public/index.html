@@ -122,6 +122,8 @@ button{padding:12px;border-radius:10px;border:none;cursor:pointer;font-weight:70
 
 <script>
 var grid = [];
+  // gameStarted ensures client waits for canonical server state in online mode
+  window.gameStarted = false;
 
 document.addEventListener('DOMContentLoaded', ()=>{
   'use strict';
@@ -413,7 +415,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
   gameCanvas.addEventListener('pointerdown', e=>{ dragging = true; lastX = e.clientX; lastY = e.clientY; gameCanvas.setPointerCapture && gameCanvas.setPointerCapture(e.pointerId); needRender = true; });
   gameCanvas.addEventListener('pointerup', e=>{ dragging = false; gameCanvas.releasePointerCapture && gameCanvas.releasePointerCapture(e.pointerId); needRender = true; });
   gameCanvas.addEventListener('pointermove', e=>{ if(!dragging) return; cam.x += (e.clientX - lastX) / cam.scale; cam.y += (e.clientY - lastY) / cam.scale; lastX = e.clientX; lastY = e.clientY; needRender = true; });
-  gameCanvas.addEventListener('click', e=>{ const pos = screenToWorld(e.clientX, e.clientY); const idx = cellAt(pos.x, pos.y); if(idx == null) return; const cell = grid[idx]; const isOnlineNow = window.isInRoom; if(selected === null){ // select only if player owns it (offline owner=0, online owner === my index)
+  gameCanvas.addEventListener('click', e=>{ const pos = screenToWorld(e.clientX, e.clientY); const idx = cellAt(pos.x, pos.y); if(idx == null) return; const cell = grid[idx]; const isOnlineNow = window.isInRoom;
+      if(isOnlineNow && !window.gameStarted){ /* ignore clicks until server sends first state */ return; } if(selected === null){ // select only if player owns it (offline owner=0, online owner === my index)
       const myIndex = (window.socketClient && window.socketClient.getPlayerIndex) ? window.socketClient.getPlayerIndex() : 0;
       if(isOnlineNow){
         if(cell.owner === myIndex) selected = idx;
