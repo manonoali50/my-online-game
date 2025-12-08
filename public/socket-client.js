@@ -51,6 +51,9 @@
       if(d && d.players) window.updateRoomPlayers(d.players);
     } else if(t==='state'){
       if(d && d.state){
+        // mark that the canonical server state arrived
+        try{ window.gameStarted = true; }catch(e){}
+
         // ensure continuous rendering so UI updates without user interaction (mobile browsers)
         if(window.requestRender) window.requestRender();
         try{  }catch(e){}
@@ -64,7 +67,7 @@
       }
     } else if(t==='error'){
       alert('خطأ: ' + (d && d.message));
-    } else if(t==='game_started'){ waitingForStart = true; window._debugLog && window._debugLog('game_started received'); } else if(t==='host_grid_received'){
+    } else if(t==='game_started'){ waitingForStart = true; window.gameStarted = false; window._debugLog && window._debugLog('game_started received'); } else if(t==='host_grid_received'){
       window._debugLog && window._debugLog('host grid received by server');
     
     } else if(t==='setCameraToBase'){
