@@ -31,6 +31,17 @@ button{padding:12px;border-radius:10px;border:none;cursor:pointer;font-weight:70
 </style>
 </head>
 <body>
+<script>
+(function(){
+  try{
+    window.showLeaderboardForOnline = function(){ var lb=document.getElementById('leaderboardPanel'); if(lb) lb.style.display='block'; };
+    window.hideLeaderboard = function(){ var lb=document.getElementById('leaderboardPanel'); if(lb) lb.style.display='none'; };
+    // hide on load
+    document.addEventListener('DOMContentLoaded', function(){ try{ var lb=document.getElementById('leaderboardPanel'); if(lb) lb.style.display='none'; }catch(e){} });
+  }catch(e){}
+})();
+</script>
+
 
 
 <canvas id="game"></canvas>
@@ -46,8 +57,8 @@ button{padding:12px;border-radius:10px;border:none;cursor:pointer;font-weight:70
 
 <div id="lobby" role="dialog" aria-label="Lobby">
   <div class="card">
-    <h1>لوبي اللعبة</h1>
-    <div id="telegramTag">@Z_S_T_O</div>
+    
+    <div id="telegramTag" style="font-weight:800;background:linear-gradient(90deg,#ffcc37,#ffe27a,#ffcc37);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 8px rgba(255,215,80,0.4),0 0 14px rgba(255,215,80,0.25);text-align:center;margin-bottom:10px">👑 @Z_S_T_O 👑</div>
 
     <label>عدد اللاعبين</label>
     <select id="playerCount">
@@ -393,7 +404,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   function checkVictory(){ const alive = players.filter(p=>p && p.alive); if(alive.length===1){ const winner = alive[0]; if(prodTimer) clearInterval(prodTimer); if(botTimer) clearInterval(botTimer); victoryText.textContent = 'الفائز هو:'; victorName.textContent = winner.name; victoryOverlay.style.display = 'flex'; playVictorySound(); } }
 
-  function returnToLobby(){ if(prodTimer) clearInterval(prodTimer); if(botTimer) clearInterval(botTimer); victoryOverlay.style.display = 'none'; document.getElementById('lobby').style.display = 'flex'; buildGrid(); setupPlayers(parseInt(playerCount.value,10)||4); seedCapitals(); updateLegend(); render(); }
+  function returnToLobby(){
+    try{ if(window.hideLeaderboard) window.hideLeaderboard(); }catch(e){}
+ if(prodTimer) clearInterval(prodTimer); if(botTimer) clearInterval(botTimer); victoryOverlay.style.display = 'none'; document.getElementById('lobby').style.display = 'flex'; buildGrid(); setupPlayers(parseInt(playerCount.value,10)||4); seedCapitals(); updateLegend(); render(); }
   if(mainMenuBtn) mainMenuBtn.addEventListener('click', returnToLobby); if(victoryToLobby) victoryToLobby.addEventListener('click', returnToLobby);
 
   if(ratioSlider && ratioValue) ratioSlider.addEventListener('input', e=> ratioValue.textContent = e.target.value + '%');
@@ -424,7 +437,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
       selected = null;
     } needRender = true; });
 
-  function startGame(){ try{ if(!grid || grid.length < 8) buildGrid(); const cnt = playerCount ? Math.max(2, Math.min(4, parseInt(playerCount.value,10) || 4)) : 4; setupPlayers(cnt); seedCapitals(); startProduction(prodRate ? parseInt(prodRate.value,10) : 900); if(botTimer) clearInterval(botTimer); botTimer = setInterval(botTick, 900); document.getElementById('lobby').style.display = 'none'; updateLegend(); needRender = true; }catch(err){ console.error(err); dbg.style.display='block'; dbg.textContent = String(err); } }
+  function startGame(){
+  try{
+    try{ if(window.hideLeaderboard) window.hideLeaderboard(); }catch(e){}
+ if(!grid || grid.length < 8) buildGrid(); const cnt = playerCount ? Math.max(2, Math.min(4, parseInt(playerCount.value,10) || 4)) : 4; setupPlayers(cnt); seedCapitals(); startProduction(prodRate ? parseInt(prodRate.value,10) : 900); if(botTimer) clearInterval(botTimer); botTimer = setInterval(botTick, 900); document.getElementById('lobby').style.display = 'none'; updateLegend(); needRender = true; }catch(err){ console.error(err); dbg.style.display='block'; dbg.textContent = String(err); } }
   window.startGame = startGame; if(startBtn) startBtn.addEventListener('click', startGame);
 
   let last = performance.now(); function frame(now){ const dt = now - last; last = now; try{ updateEffectsAndAnimations(dt); if(needRender || animations.length>0 || effects.length>0){ render(); } }catch(e){ console.error(e); dbg.style.display='block'; dbg.textContent = String(e); } requestAnimationFrame(frame); } requestAnimationFrame(frame);
@@ -556,6 +572,8 @@ window._debugLog = debugLog;
 /* applyState and online helpers: these will be called by socket-client.js when state arrives */
 window.applyState = function(state){
   try{
+    if(!window.isInRoom) return;
+
     if(!state) return;
     if(state.grid && Array.isArray(state.grid)){
       window.grid = state.grid;
@@ -593,6 +611,8 @@ window.applyState = function(state){
 
 window.startOnlineGame = function(state){
   try{
+    try{ if(window.showLeaderboardForOnline) window.showLeaderboardForOnline(); }catch(e){}
+
     if(!state) return;
     window.isOnline = true;
     window.isInRoom = true;
