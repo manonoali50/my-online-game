@@ -140,7 +140,7 @@ function handleMessage(ws, msg){
     rooms[roomId] = room;
     // determine index and color
     const idx = getNextIndexForRoom(room);
-    const color = pickRandomAvailableColor(room);
+    const color = colorPool[idx];
     const player = { ws, index: idx, name: d.name || ('P'+(idx+1)), alive:true, capital:null, color: color };
     room.players.push(player);
     room.host = player.index;
@@ -152,7 +152,7 @@ function handleMessage(ws, msg){
     if(room.players.length >= room.maxPlayers){ ws.send(JSON.stringify({t:'error', d:{message:'الغرفة ممتلئة'}})); return; }
     const idx = getNextIndexForRoom(room);
     // assign next available random color (non-repeating)
-    const color = pickRandomAvailableColor(room);
+    const color = colorPool[idx];
     const player = { ws, index: idx, name: 'P'+(idx+1), alive:true, capital:null, color };
     room.players.push(player);
     // notify joining player
