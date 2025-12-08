@@ -751,11 +751,10 @@ if(window.socket){
 </div>
 
 <script>
-let lbOnlineOnly = true;
+let lbOnlineOnly = false;
 
 
 function updateLeaderboard(){
-  if(lbOnlineOnly && !window.isOnline) return;
   if(!window.players || !window.grid) return;
   const lb=document.getElementById("leaderboardContent");
 
