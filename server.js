@@ -191,7 +191,7 @@ function handleMessage(ws, msg){
     if(!room.grid || room.grid.length===0) room.grid = buildGridForServer(Math.max(8,10), Math.max(6,8));
     // reset all ownership/troops
     room.grid.forEach(c=>{ c.owner = null; c.troops = 0; });
-    const playersArr = room.players.map(p=>({ ws:p.ws, index:p.index, capital:p.capital||null, alive:true, color:p.color }));
+    const playersArr = room.players.map(p=>({ws:p.ws, index:p.index, capital:p.capital||null, alive:true}));
     // seed capitals for this match (ensures fresh starts)
     seedCapitalsForPlayers(room.grid, playersArr);
     // save capitals back to room players
@@ -199,7 +199,6 @@ function handleMessage(ws, msg){
       const rp = room.players.find(p=>p.index===pa.index);
       if(rp) rp.capital = pa.capital;
       if(rp) rp.alive = true;
-      if(rp) rp.color = pa.color;
     }
     // broadcast players (include color)
     const playersForState = room.players.map(p=>({ index:p.index, name:p.name, isHost:(room.host===p.index), capital:p.capital, alive:p.alive, color:p.color }));
