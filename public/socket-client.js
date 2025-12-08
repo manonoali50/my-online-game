@@ -1,4 +1,14 @@
 (function(){
+function __syncPlayersFromServer(arr){
+    try{
+        window.players = (arr||[]).map(p=>({ id:p.index, index:p.index, name:p.name, color:p.color, capital:p.capital, alive:!!p.alive, isHost:!!p.isHost }));
+        // also sync local players array used for rendering if exists
+        try{ players = window.players.map(p=>({ id:p.index, index:p.index, name:p.name, color:p.color, capital:p.capital, alive:!!p.alive })); }catch(e){}
+        if(typeof updateLegend === 'function') try{ updateLegend(); }catch(e){};
+        if(typeof window.updateRoomPlayers === 'function') try{ window.updateRoomPlayers(window.players); }catch(e){};
+    }catch(e){ console.warn('sync players helper failed', e); }
+}
+
   const proto = (location.protocol === 'https:' ? 'wss://' : 'ws://');
   const host = location.host;
   const url = proto + host + '/ws';
@@ -35,6 +45,7 @@
       window.isInRoom = true;
       alert('تم إنشاء الغرفة: ' + roomId + '\nانت المضيف.');
       window.updateRoomPlayers && window.updateRoomPlayers(d.players || []);
+      try{ __syncPlayersFromServer(d.players || []); }catch(e){};
       document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + roomId;
       const leaveBtn = document.getElementById('leaveRoomBtn');
       if(leaveBtn) leaveBtn.style.display = 'inline-block';
@@ -43,24 +54,29 @@
       window.isInRoom = true;
       alert('انضممت للغرفة: ' + roomId + (isHost? ' (مضيف)':''));
       window.updateRoomPlayers && window.updateRoomPlayers(d.players || []);
+      try{ __syncPlayersFromServer(d.players || []); }catch(e){};
       document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + roomId;
       const leaveBtn = document.getElementById('leaveRoomBtn');
       if(leaveBtn) leaveBtn.style.display = 'inline-block';
     } else if(t==='player_joined' || t==='player_left' || t==='host_changed'){
       window._debugLog('room event: ' + t);
       if(d && d.players) window.updateRoomPlayers(d.players);
+      try{ __syncPlayersFromServer(d.players || []); }catch(e){};
     } else if(t==='state'){
       if(d && d.state){
         // ensure continuous rendering so UI updates without user interaction (mobile browsers)
         if(window.requestRender) window.requestRender();
         try{  }catch(e){}
 
-        if(waitingForStart){ waitingForStart = false; window._debugLog && window._debugLog('Starting online game from state'); if(window.startOnlineGame){ window.startOnlineGame(d.state); } }
-        window.lastStateFromServer = d.state; try{ if(window.applyState) window.applyState(d.state); }catch(e){ console.warn('applyState failed', e); }
+        if(waitingForStart){ waitingForStart = false; window._debugLog && window._debugLog('Starting online game from state'); if(window.startOnlineGame){ window.startOnlineGame(d.state); }
+        try{ __syncPlayersFromServer(d.players || d.state.players || []); }catch(e){}; }
+        window.lastStateFromServer = d.state; try{ if(window.applyState) window.applyState(d.state);
+        try{ __syncPlayersFromServer(d.players || d.state.players || []); }catch(e){}; }catch(e){ console.warn('applyState failed', e); }
         if(window.requestRender) window.requestRender();
         if(window.render) window.render(); if(window.requestRender) window.requestRender(); try{  }catch(e){}
         document.getElementById('roomInfo') && (document.getElementById('roomInfo').textContent = 'رمز الغرفة: ' + (roomId||'—'));
         if(d.players) window.updateRoomPlayers(d.players);
+      try{ __syncPlayersFromServer(d.players || []); }catch(e){};
       }
     } else if(t==='error'){
       alert('خطأ: ' + (d && d.message));
