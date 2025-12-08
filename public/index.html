@@ -757,10 +757,54 @@ const fixedColors = ['#ff5555','#3399ff','#00c48c','#ffe047'];
 function updateLeaderboard(){
   if(lbOnlineOnly && !window.isOnline) return;
   if(!window.players || !window.grid) return;
+
   const lb=document.getElementById("leaderboardContent");
 
-  // build lookup map by player index (handles id/index inconsistencies)
   const playerMap = {};
+  window.players.forEach(p=>{
+    const idx = (typeof p.index !== 'undefined') ? p.index : (typeof p.id !== 'undefined' ? p.id : null);
+    if(idx !== null) playerMap[idx] = p;
+  });
+
+  const fixedColors = ['#ff5555','#3399ff','#00c48c','#ffe047'];
+
+  const stats = Object.keys(playerMap).map(k=>{
+    const pi = parseInt(k,10);
+    const p = playerMap[pi];
+    const owned = window.grid.filter(c=>c.owner===pi).length;
+    const troops = window.grid.filter(c=>c.owner===pi).reduce((a,c)=>a + (c.troops||0), 0);
+    return {
+      index: pi,
+      name: p.name || ('P' + (pi+1)),
+      color: fixedColors[pi] || '#999',
+      owned,
+      troops,
+      alive: !!p.alive
+    };
+  }).sort((a,b)=> {
+    if(b.owned !== a.owned) return b.owned - a.owned;
+    return b.troops - a.troops;
+  });
+
+  lb.innerHTML = stats.map((s,i)=>`
+    <div class="lb-item" style="opacity:${s.alive?1:.45}">
+
+      <div class="lb-top">
+
+        ${i===0 ? `<span class="crown">👑</span>` : ``}
+
+        <div class="lb-name">${s.name}</div>
+
+        <div class="lb-color" style="background:${s.color}; width:16px;height:16px;border-radius:4px;"></div>
+
+      </div>
+
+      <div class="lb-stats">
+        خلايا: ${s.owned} | الجنود: ${s.troops}
+      </div>
+    </div>
+  `).join("");
+};
   window.players.forEach(p=>{
     const idx = (typeof p.index !== 'undefined') ? p.index : (typeof p.id !== 'undefined' ? p.id : null);
     if(idx !== null) playerMap[idx] = p;
