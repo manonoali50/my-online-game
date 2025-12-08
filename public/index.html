@@ -753,10 +753,19 @@ if(window.socket){
 <script>
 let lbOnlineOnly = true;
 
+
 function updateLeaderboard(){
   if(lbOnlineOnly && !window.isOnline) return;
   if(!window.players || !window.grid) return;
   const lb=document.getElementById("leaderboardContent");
+
+  // fixed color mapping as requested: P1=red, P2=blue, P3=green, P4=yellow
+  const fixedColors = {
+    0: '#ff5555', // P1 red
+    1: '#3399ff', // P2 blue
+    2: '#00c48c', // P3 green
+    3: '#ffe047'  // P4 yellow
+  };
 
   // build lookup map by player index (handles id/index inconsistencies)
   const playerMap = {};
@@ -771,7 +780,9 @@ function updateLeaderboard(){
     const p = playerMap[pi];
     const owned = window.grid.filter(c=>c.owner===pi).length;
     const troops = window.grid.filter(c=>c.owner===pi).reduce((a,c)=>a + (c.troops||0), 0);
-    return {index:pi, name: p.name||('P'+(pi+1)), color: p.color||'#999999', owned, troops, alive: !!p.alive};
+    // enforce fixed color mapping (fall back to provided color if out of range)
+    const color = (pi in fixedColors) ? fixedColors[pi] : (p.color || '#999999');
+    return {index:pi, name: p.name||('P'+(pi+1)), color: color, owned, troops, alive: !!p.alive};
   }).sort((a,b)=> {
     if(b.owned !== a.owned) return b.owned - a.owned;
     return b.troops - a.troops;
@@ -780,7 +791,7 @@ function updateLeaderboard(){
   lb.innerHTML = stats.map((s,i)=>`
     <div class="lb-item" style="opacity:${s.alive?1:.45}">
       <div class="lb-top">
-        
+        <div class="lb-color" style="background:${s.color}"></div>
         <div class="lb-name">${i===0 ? "👑 " : ""}${s.name}</div>
       </div>
       <div class="lb-stats">
@@ -789,6 +800,7 @@ function updateLeaderboard(){
     </div>
   `).join("");
 }
+
 setInterval(updateLeaderboard,700);
 
 
