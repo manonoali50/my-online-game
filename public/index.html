@@ -753,6 +753,7 @@ if(window.socket){
 <script>
 let lbOnlineOnly = true;
 
+const fixedColors = ['#ff5555','#3399ff','#00c48c','#ffe047'];
 function updateLeaderboard(){
   if(lbOnlineOnly && !window.isOnline) return;
   if(!window.players || !window.grid) return;
@@ -781,7 +782,7 @@ function updateLeaderboard(){
     <div class="lb-item" style="opacity:${s.alive?1:.45}">
       <div class="lb-top">
         
-        <div class="lb-name" style="width:22px;height:22px;border-radius:4px;background:${(s.index===0?"#ff5555":(s.index===1?"#3399ff":(s.index===2?"#00c48c":"#ffe047")))};"></div>
+        <div class="lb-name">${i===0 ? "👑 " : ""}${i+1}. ${s.name}</div>
       </div>
       <div class="lb-stats">
         خلايا: ${s.owned} | الجنود: ${s.troops}
