@@ -53,58 +53,31 @@ function seedCapitalsForPlayers(grid, playersArr){
 }
 
 function moveTroopsServer(grid, playersArr, fromIdx, toIdx, ratio){
-  const changed = [];
   if(!grid[fromIdx] || !grid[toIdx]) return;
   const f = grid[fromIdx], t = grid[toIdx];
   const send = Math.floor(f.troops * ratio);
-  if(send <= 0) return changed;
+  if(send <= 0) return;
   f.troops = Math.max(0, f.troops - send);
-  changed.push({ i: fromIdx, owner: f.owner, troops: f.troops });
-  if(t.owner === f.owner){ t.troops += send; changed.push({ i: toIdx, owner: t.owner, troops: t.troops }); }
+  if(t.owner === f.owner){ t.troops += send; }
   else {
     if(send > t.troops){
       const defeatedOwner = t.owner;
       t.owner = f.owner;
       t.troops = send - t.troops;
-      changed.push({ i: toIdx, owner: t.owner, troops: t.troops });
       if(defeatedOwner != null){
         const defPlayer = playersArr.find(p=>p.index === defeatedOwner);
         if(defPlayer && defPlayer.capital === toIdx){
           defPlayer.alive = false;
-          for(const c of grid){ if(c.owner === defeatedOwner){ c.owner = null; c.troops = 0; changed.push({ i: grid.indexOf(c), owner: null, troops: 0 }); } }
+          for(const c of grid){ if(c.owner === defeatedOwner){ c.owner = null; c.troops = 0; } }
         }
       }
     } else {
       t.troops = Math.max(0, t.troops - send);
-      changed.push({ i: toIdx, owner: t.owner, troops: t.troops });
     }
-  return changed;
   }
 }
 
 const rooms = {};
-
-// Simple per-socket rate limiting (max messages per 1000ms)
-function allowMessage(ws, limitPerSec = 30){
-  const now = Date.now();
-  if(!ws._msgTimestamps) ws._msgTimestamps = [];
-  // remove older than 1000ms
-  ws._msgTimestamps = ws._msgTimestamps.filter(t => now - t < 1000);
-  if(ws._msgTimestamps.length >= limitPerSec) return false;
-  ws._msgTimestamps.push(now);
-  return true;
-}
-
-// Helper to check adjacency
-function areNeighbors(grid, a, b){
-  if(!grid[a] || !grid[b]) return false;
-  // quick neighbor check using stored neighbors if present
-  if(Array.isArray(grid[a].neighbors) && grid[a].neighbors.length>0){
-    return grid[a].neighbors.includes(b);
-  }
-  return Math.hypot(grid[a].x - grid[b].x, grid[a].y - grid[b].y) < HEX * 1.75;
-}
-
 
 function getNextIndexForRoom(room){
   const used = new Set(room.players.map(p=>p.index));
@@ -123,8 +96,6 @@ function pickRandomAvailableColor(room){
 wss.on('connection', function connection(ws){
   ws.id = uuidv4();
   ws.on('message', function incoming(message){
-    try{ if(!allowMessage(ws)){ ws.send(JSON.stringify({t:'error', d:{message:'rate_limit_exceeded'}})); return; } }catch(e){}
-
     try{
       const msg = JSON.parse(message);
       // support a lightweight ping/pong (client sends {type:'ping', t:...})
@@ -220,7 +191,7 @@ function handleMessage(ws, msg){
     if(!room.grid || room.grid.length===0) room.grid = buildGridForServer(Math.max(8,10), Math.max(6,8));
     // reset all ownership/troops
     room.grid.forEach(c=>{ c.owner = null; c.troops = 0; });
-    const playersArr = room.players.map(p=>({ws:p.ws, index:p.index, capital:p.capital||null, alive:true}));
+    const playersArr = room.players.map(p=>({ ws:p.ws, index:p.index, capital:p.capital||null, alive:true, color:p.color }));
     // seed capitals for this match (ensures fresh starts)
     seedCapitalsForPlayers(room.grid, playersArr);
     // save capitals back to room players
@@ -228,6 +199,7 @@ function handleMessage(ws, msg){
       const rp = room.players.find(p=>p.index===pa.index);
       if(rp) rp.capital = pa.capital;
       if(rp) rp.alive = true;
+      if(rp) rp.color = pa.color;
     }
     // broadcast players (include color)
     const playersForState = room.players.map(p=>({ index:p.index, name:p.name, isHost:(room.host===p.index), capital:p.capital, alive:p.alive, color:p.color }));
