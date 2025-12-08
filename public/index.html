@@ -31,7 +31,18 @@ button{padding:12px;border-radius:10px;border:none;cursor:pointer;font-weight:70
 </style>
 </head>
 <body>
-<div id="pingDisplay" style="position:absolute;top:60px;right:14px;color:white;font-size:18px;display:none;pointer-events:none;z-index:2500;">0 ms</div>
+<script>
+(function(){
+  try{
+    window.showLeaderboardForOnline = function(){ var lb=document.getElementById('leaderboardPanel'); if(lb) lb.style.display='block'; };
+    window.hideLeaderboard = function(){ var lb=document.getElementById('leaderboardPanel'); if(lb) lb.style.display='none'; };
+    // hide on load
+    document.addEventListener('DOMContentLoaded', function(){ try{ var lb=document.getElementById('leaderboardPanel'); if(lb) lb.style.display='none'; }catch(e){} });
+  }catch(e){}
+})();
+</script>
+
+
 
 <canvas id="game"></canvas>
 <canvas id="lineLayer" style="position:fixed;inset:0;pointer-events:none;z-index:1700"></canvas>
@@ -47,7 +58,7 @@ button{padding:12px;border-radius:10px;border:none;cursor:pointer;font-weight:70
 <div id="lobby" role="dialog" aria-label="Lobby">
   <div class="card">
     
-    <div id="telegramTag" style="background:linear-gradient(90deg,#ffd36b,#ffd700);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:800;text-align:center;margin-bottom:10px;text-shadow:0 6px 18px rgba(255,215,80,0.12),0 2px 6px rgba(0,0,0,0.6)">@Z_S_T_O</div>
+    <div id="telegramTag" style="font-weight:800;background:linear-gradient(90deg,#ffcc37,#ffe27a,#ffcc37);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 8px rgba(255,215,80,0.4),0 0 14px rgba(255,215,80,0.25);text-align:center;margin-bottom:10px">👑 @Z_S_T_O 👑</div>
 
     <label>عدد اللاعبين</label>
     <select id="playerCount">
@@ -61,7 +72,7 @@ button{padding:12px;border-radius:10px;border:none;cursor:pointer;font-weight:70
 
     <div style="margin-top:12px">
       <button id="startBtn" class="green" style="width:100%">ابدأ</button>
-<button id="pingToggle" title="Ping (P)" style="position:absolute;left:55px;top:10px;width:40px;height:40px;background:#a00;color:#fff;font-size:22px;border:none;border-radius:10px;cursor:pointer;font-weight:700">P</button>
+
     <button id="onlineBtnLocal" class="green" style="width:100%;background:#06b6d4;margin-top:8px">اونلاين (غرف)</button>
     </div>
   </div>
@@ -668,59 +679,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
 
 <script>
-let pingOn=false;
-let lastPing=0;
-let pingInterval=null;
-const pingBtn=document.getElementById("pingToggle");
-const pingDiv=document.getElementById("pingDisplay");
-
-// helper to attach pong listener to current socket
-function attachPongListener(sock){
-  try{
-    if(!sock) return;
-    // avoid adding duplicate handlers
-    if(sock._pongAttached) return;
-    sock._pongAttached = true;
-    sock.addEventListener("message", ev=>{
-      try{
-        const d = JSON.parse(ev.data);
-        if(d && (d.type === "pong" || d.t !== undefined && d.type === "pong")){
-          // compute RTT and display (keeps same UI)
-          pingDiv.textContent = (Date.now() - d.t) + " ms";
-        }
-      }catch(e){}
-    });
-  }catch(e){}
-}
-
-// if socket-client sets window.socket, try to attach immediately
-if(window.socket) attachPongListener(window.socket);
-
-// also expose a small hook so socket-client can call attachPongListener after reconnects
-window._attachPongListener = attachPongListener;
-
-pingBtn.onclick=()=>{
- pingOn=!pingOn;
- if(pingOn){
-   pingBtn.style.background="#0a0";
-   pingDiv.style.display="block";
-   // start sending pings every 1000ms
-   if(pingInterval) clearInterval(pingInterval);
-   pingInterval=setInterval(()=>{
-     try{
-       const t=Date.now();
-       if(window.socket && window.socket.readyState===1){
-         window.socket.send(JSON.stringify({type:"ping", t}));
-       }
-     }catch(e){}
-   },1000);
- } else {
-   pingBtn.style.background="#a00";
-   pingDiv.style.display="none";
-   clearInterval(pingInterval);
-   pingInterval = null;
- }
-};,1000);
+,1000);
    }
  } else {
    pingBtn.style.background="#a00";
@@ -785,10 +744,6 @@ if(window.socket){
 .lb-stats{font-size:12px; opacity:.8; margin-top:3px;}
 </style>
 
-
-<script>
-(function(){ try{ var lb=document.getElementById("leaderboardPanel"); if(lb) lb.style.display = "none"; window.showLeaderboardForOnline = function(){ if(lb) lb.style.display = "block"; }; window.hideLeaderboard = function(){ if(lb) lb.style.display = "none"; }; }catch(e){} })();
-</script>
 <div id="leaderboardPanel">
   <div id="lbToggleBtn">≡</div>
   <h3 style="margin:0 0 10px;text-align:center">🏆 الترتيب</h3>
@@ -825,7 +780,7 @@ function updateLeaderboard(){
   lb.innerHTML = stats.map((s,i)=>`
     <div class="lb-item" style="opacity:${s.alive?1:.45}">
       <div class="lb-top">
-        <div class="lb-color" style="background:${s.color}"></div>
+        
         <div class="lb-name">${i===0 ? "👑 " : ""}${s.name}</div>
       </div>
       <div class="lb-stats">
