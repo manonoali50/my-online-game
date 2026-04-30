@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-<title>Territorial — Stable Final</title>
+<title>TROOBS.IO — Stable Final</title>
 <style>
 html,body{margin:0;padding:0;overflow:hidden;background:#0d1117;font-family:Tahoma,Arial,sans-serif;touch-action:manipulation}
 canvas{display:block;touch-action:none}
@@ -53,16 +53,13 @@ button{padding:12px;border-radius:10px;border:none;cursor:pointer;font-weight:70
 #victoryCard h1{margin:8px 0 6px 0;font-size:32px}
 #victoryCard .crown{font-size:46px}
 #victoryCard button{margin-top:12px;padding:10px 16px;border-radius:10px;border:none;cursor:pointer}
-
-#settingsBtn{position:fixed;right:12px;top:10px;z-index:2050;background:rgba(107,114,128,0.8);color:white;padding:8px 12px;border-radius:50%;cursor:pointer;font-size:20px;border:none;width:44px;height:44px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:all 0.2s}
+#settingsBtn{position:fixed;left:12px;top:52px;z-index:2050;background:rgba(107,114,128,0.8);color:white;padding:8px 12px;border-radius:50%;cursor:pointer;font-size:20px;border:none;width:44px;height:44px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:all 0.2s}
 #settingsBtn:hover{background:rgba(156,163,175,0.9);transform:rotate(90deg)}
-
 #settingsPage{position:fixed;inset:0;z-index:3000;background:rgba(6,10,18,0.95);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;flex-direction:column}
 #settingsCard{background:linear-gradient(180deg,#1e293b,#0f172a);padding:28px 24px;border-radius:16px;width:340px;box-shadow:0 12px 40px rgba(0,0,0,0.8);border:1px solid rgba(255,255,255,0.08);color:#e2e8f0;text-align:center}
 #settingsCard h2{margin:0 0 20px;font-size:22px;color:#f1f5f9}
 #settingsBackBtn{position:absolute;top:12px;right:12px;background:rgba(255,255,255,0.1);color:white;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:14px;border:none;transition:all 0.2s;z-index:3001}
 #settingsBackBtn:hover{background:rgba(255,255,255,0.2)}
-
 #musicToggleBtn{padding:12px 24px;border-radius:10px;border:none;cursor:pointer;font-weight:700;font-size:16px;width:100%;transition:all 0.3s}
 .music-on{background:#16a34a;color:white;box-shadow:0 4px 15px rgba(22,163,74,0.4)}
 .music-off{background:#dc2626;color:white;box-shadow:0 4px 15px rgba(220,38,38,0.4)}
@@ -114,102 +111,19 @@ const coinDisplay=document.getElementById('coinDisplay'),coinAmount=document.get
 const buildPanel=document.getElementById('buildPanel'),buildOptions=document.getElementById('buildOptions');
 const launchPanel=document.getElementById('launchPanel'),launchBtn=document.getElementById('launchBtn');
 const dbg=document.getElementById('dbg');
-
 const musicToggleBtn=document.getElementById('musicToggleBtn');
 const settingsBtn=document.getElementById('settingsBtn');
 const settingsPage=document.getElementById('settingsPage');
 const settingsBackBtn=document.getElementById('settingsBackBtn');
 
-let musicOn=false;
-let bgMusic=null;
-let audioUnlocked=false;
-
-// فتح AudioContext عند أول نقرة - الحيلة الذهبية
-function unlockAudio(){
-  if(audioUnlocked) return;
-  const AudioCtx=window.AudioContext||window.webkitAudioContext;
-  if(!AudioCtx) return;
-  try{
-    const ctx=new AudioCtx();
-    const buf=ctx.createBuffer(1,1,22050);
-    const src=ctx.createBufferSource();
-    src.buffer=buf;
-    src.connect(ctx.destination);
-    src.start(0);
-    audioUnlocked=true;
-    // الآن نشغل الموسيقى إذا كانت مفعلة
-    if(musicOn && bgMusic){
-      bgMusic.play().catch(()=>{});
-    }
-  }catch(e){}
-  document.removeEventListener('click',unlockAudio);
-  document.removeEventListener('touchstart',unlockAudio);
-}
-
-document.addEventListener('click',unlockAudio);
-document.addEventListener('touchstart',unlockAudio);
-
-// إنشاء عنصر الصوت
-function createAudio(){
-  if(bgMusic) return bgMusic;
-  bgMusic=new Audio();
-  bgMusic.loop=true;
-  bgMusic.volume=0.4;
-  bgMusic.preload='auto';
-  bgMusic.src='https://cdn.pixabay.com/audio/2022/10/25/audio_946f6d7c64.mp3';
-  bgMusic.load();
-  document.body.appendChild(bgMusic);
-  return bgMusic;
-}
-
-// دالة تشغيل/إيقاف الموسيقى
-window.toggleMusic=function(){
-  if(!bgMusic) createAudio();
-  if(musicOn){
-    bgMusic.pause();
-    musicOn=false;
-    musicToggleBtn.textContent='🔇 إيقاف الموسيقى';
-    musicToggleBtn.className='music-off';
-  } else {
-    musicOn=true;
-    if(audioUnlocked){
-      bgMusic.play().then(()=>{
-        musicToggleBtn.textContent='🎵 تشغيل الموسيقى';
-        musicToggleBtn.className='music-on';
-      }).catch(()=>{
-        musicOn=false;
-        musicToggleBtn.textContent='⚠️ خطأ';
-        musicToggleBtn.className='music-off';
-      });
-    } else {
-      // إذا ما بعد تم فتح الصوت، نخلي الزر أخضر وننتظر النقرة
-      musicToggleBtn.textContent='🎵 تشغيل الموسيقى';
-      musicToggleBtn.className='music-on';
-    }
-  }
-};
-
-// بدء الموسيقى مع بدء اللعبة
-function startMusic(){
-  if(!bgMusic) createAudio();
-  musicOn=true;
-  musicToggleBtn.textContent='🎵 تشغيل الموسيقى';
-  musicToggleBtn.className='music-on';
-  if(audioUnlocked && bgMusic){
-    bgMusic.currentTime=0;
-    bgMusic.play().catch(()=>{});
-  }
-}
-
-settingsBtn.addEventListener('click',(e)=>{
-  e.stopPropagation();
-  settingsPage.style.display='flex';
-});
-
-settingsBackBtn.addEventListener('click',(e)=>{
-  e.stopPropagation();
-  settingsPage.style.display='none';
-});
+let musicOn=false;let bgMusic=null;let audioUnlocked=false;
+function unlockAudio(){if(audioUnlocked)return;const actx=new(window.AudioContext||window.webkitAudioContext)();const buf=actx.createBuffer(1,1,22050);const src=actx.createBufferSource();src.buffer=buf;src.connect(actx.destination);src.start(0);audioUnlocked=true;if(musicOn&&bgMusic){bgMusic.play().catch(()=>{});}document.removeEventListener('click',unlockAudio);document.removeEventListener('touchstart',unlockAudio);}
+document.addEventListener('click',unlockAudio);document.addEventListener('touchstart',unlockAudio);
+function createAudio(){if(bgMusic)return bgMusic;bgMusic=new Audio();bgMusic.loop=true;bgMusic.volume=0.4;bgMusic.preload='auto';bgMusic.src='https://cdn.pixabay.com/audio/2022/10/25/audio_946f6d7c64.mp3';bgMusic.load();document.body.appendChild(bgMusic);return bgMusic;}
+window.toggleMusic=function(){if(!bgMusic)createAudio();if(musicOn){bgMusic.pause();musicOn=false;musicToggleBtn.textContent='🔇 إيقاف الموسيقى';musicToggleBtn.className='music-off';}else{musicOn=true;if(audioUnlocked){bgMusic.play().then(()=>{musicToggleBtn.textContent='🎵 تشغيل الموسيقى';musicToggleBtn.className='music-on';}).catch(()=>{musicOn=false;musicToggleBtn.textContent='⚠️ خطأ';musicToggleBtn.className='music-off';});}else{musicToggleBtn.textContent='🎵 تشغيل الموسيقى';musicToggleBtn.className='music-on';}}};
+function startMusic(){if(!bgMusic)createAudio();musicOn=true;musicToggleBtn.textContent='🎵 تشغيل الموسيقى';musicToggleBtn.className='music-on';if(audioUnlocked&&bgMusic){bgMusic.currentTime=0;bgMusic.play().catch(()=>{});}}
+settingsBtn.addEventListener('click',(e)=>{e.stopPropagation();settingsPage.style.display='flex';});
+settingsBackBtn.addEventListener('click',(e)=>{e.stopPropagation();settingsPage.style.display='none';});
 
 if(!gameCanvas){ dbg.style.display='block'; dbg.textContent='Error'; return; }
 const ctx=gameCanvas.getContext('2d');
@@ -227,10 +141,10 @@ var wallLevel=0;
 var interceptHits={};
 var missileNeeds={};
 var wallCheckInterval=null;
+var patriotCooldowns={}; // تتبع وقت التبريد لكل منصة باتريوت (cellIndex -> endTime)
 
-// إعادة استخدام AudioContext المفتوح سابقاً
 function getAudioCtx(){
-  return window.AudioContext?new(window.AudioContext||window.webkitAudioContext)():null;
+  return new(window.AudioContext||window.webkitAudioContext)();
 }
 
 function playMissileLaunchSound(){ const actx=getAudioCtx(); if(!actx) return; const now=actx.currentTime; for(let i=0;i<3;i++){ const o=actx.createOscillator(),g=actx.createGain(); o.type='sawtooth'; o.frequency.setValueAtTime(60+i*25,now); o.frequency.linearRampToValueAtTime(250+i*50,now+1); g.gain.setValueAtTime(0.0001,now); g.gain.exponentialRampToValueAtTime(0.12,now+0.15); g.gain.exponentialRampToValueAtTime(0.0001,now+1.5); o.connect(g); g.connect(actx.destination); o.start(now); o.stop(now+1.6); } setTimeout(()=>{ const o=actx.createOscillator(),g=actx.createGain(); o.type='sine'; o.frequency.setValueAtTime(800,actx.currentTime); o.frequency.linearRampToValueAtTime(1500,actx.currentTime+0.6); g.gain.setValueAtTime(0.0001,actx.currentTime); g.gain.exponentialRampToValueAtTime(0.07,actx.currentTime+0.1); g.gain.exponentialRampToValueAtTime(0.0001,actx.currentTime+0.7); o.connect(g); g.connect(actx.destination); o.start(actx.currentTime); o.stop(actx.currentTime+0.8); },500); }
@@ -330,6 +244,7 @@ function addCoins(){ if(!gameStarted) return; if(!vn(playerCoins)) playerCoins=0
 
 function checkPatriotIntercept(){
   if(!gameStarted||!vn(playerCoins)||playerCoins<400||missiles.length===0) return;
+  const now=performance.now();
   for(let mi=0;mi<missiles.length;mi++){
     const m=missiles[mi]; if(m.exploded||m.isPlayer) continue;
     const id=m.id; const need=missileNeeds[id]||1; const hits=interceptHits[id]||0;
@@ -337,10 +252,21 @@ function checkPatriotIntercept(){
     const p=Math.min(1,m.t/(m.duration||1)); const wx=m.wx+(m.tx-m.wx)*p; const wy=m.wy+(m.ty-m.wy)*p;
     if(!vn(wx)||!vn(wy)) continue;
     let cp=null,cd=Infinity;
-    for(let i=0;i<grid.length;i++){ const cell=grid[i]; if(!cell||!cell.patriot||cell.owner!==0) continue; const gx=cell.x,gy=cell.y; if(!vn(gx)||!vn(gy)) continue; const d=Math.hypot(gx-wx,gy-wy); if(d<HEX*2.8&&d<cd){ cd=d; cp=i; } }
+    for(let i=0;i<grid.length;i++){ 
+      const cell=grid[i]; 
+      if(!cell||!cell.patriot||cell.owner!==0) continue;
+      // التحقق من التبريد
+      if(patriotCooldowns[i] && now<patriotCooldowns[i]) continue;
+      const gx=cell.x,gy=cell.y; 
+      if(!vn(gx)||!vn(gy)) continue; 
+      const d=Math.hypot(gx-wx,gy-wy); 
+      if(d<HEX*2.8&&d<cd){ cd=d; cp=i; } 
+    }
     if(cp!==null&&playerCoins>=400){
       playerCoins-=400; updateCoinDisplay(); interceptHits[id]=hits+1;
-      interceptorMissiles.push({pw:grid[cp].x,py:grid[cp].y,tw:wx,ty:wy,t:0,duration:500,missileRef:m,need});
+      interceptorMissiles.push({pw:grid[cp].x,py:grid[cp].y,tw:wx,ty:wy,t:0,duration:500,missileRef:m,need,patriotCell:cp});
+      // بدء التبريد لمدة 8 ثواني
+      patriotCooldowns[cp]=now+8000;
       playInterceptorSound();
     }
   }
@@ -466,6 +392,7 @@ function render(){
   if(!ctx) return;
   if(Math.abs(cam.scale-cam.targetScale)>0.001){ cam.scale+=(cam.targetScale-cam.scale)*0.1; needRender=true; }
   ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,W,H); ctx.fillStyle='#0d1117'; ctx.fillRect(0,0,W,H); if(!grid||grid.length===0){ needRender=false; return; }
+  const now=performance.now();
   for(let i=0;i<grid.length;i++){ 
     if(!grid[i]) continue;
     const c=grid[i],s=worldToScreen(c.x,c.y);
@@ -474,19 +401,44 @@ function render(){
     if(i===selected){ ctx.strokeStyle='#00ff00'; ctx.lineWidth=3; ctx.stroke(); }
     ctx.fillStyle='#000'; ctx.textAlign='center'; ctx.font=(14*Math.max(0.7,cam.scale))+'px Tahoma'; ctx.fillText(c.troops,s.x,s.y+(5*cam.scale));
     if(c.missileLauncher){ ctx.fillStyle='#ff3333'; ctx.font='bold 22px Tahoma'; ctx.textAlign='center'; ctx.fillText('🚀',s.x-(c.patriot?18*cam.scale:0),s.y-(14*cam.scale)); }
-    if(c.patriot){ drawPatriotRadar(s.x+(c.missileLauncher?14*cam.scale:0),s.y-(10*cam.scale),cam.scale,true); }
+    if(c.patriot){ drawPatriotRadar(s.x+(c.missileLauncher?14*cam.scale:0),s.y-(10*cam.scale),cam.scale,true); 
+      // رسم شريط التبريد إذا كان في تبريد
+      if(patriotCooldowns[i] && now<patriotCooldowns[i]){
+        const remaining=patriotCooldowns[i]-now;
+        const progress=1-(remaining/8000); // 0 إلى 1
+        const barWidth=HEX*cam.scale*1.2;
+        const barHeight=4*cam.scale;
+        const barX=s.x-barWidth/2;
+        const barY=s.y-(16*cam.scale);
+        // خلفية الشريط
+        ctx.fillStyle='rgba(0,0,0,0.6)';
+        ctx.fillRect(barX,barY,barWidth,barHeight);
+        // شريط التقدم الأخضر
+        ctx.fillStyle='#22c55e';
+        ctx.fillRect(barX,barY,barWidth*progress,barHeight);
+        // إطار الشريط
+        ctx.strokeStyle='rgba(255,255,255,0.4)';
+        ctx.lineWidth=0.5*cam.scale;
+        ctx.strokeRect(barX,barY,barWidth,barHeight);
+        // عرض الوقت المتبقي
+        ctx.fillStyle='#fff';
+        ctx.font=(8*Math.max(0.7,cam.scale))+'px Tahoma';
+        ctx.textAlign='center';
+        ctx.fillText(Math.ceil(remaining/1000)+'s',s.x,barY-3*cam.scale);
+      }
+    }
     else if(c.protectedByPatriot&&c.owner===0){ ctx.fillStyle='#60a5fa'; ctx.font=(10*Math.max(0.7,cam.scale))+'px Tahoma'; ctx.fillText('🛡️',s.x,s.y-(12*cam.scale)); }
   }
   drawWalls(); updateInterceptorMissiles(16); drawMissiles(); drawCellFires();
   for(const p of players){ if(p&&p.capital!=null&&p.alive) drawCapitalMarker(p.capital); }
-  const now=performance.now();
-  for(const p of players){ if(!p||p.capital==null||!p.alive) continue; const cap=grid[p.capital]; if(!cap) continue; let danger=false; for(let i=0;i<grid.length;i++){ const c=grid[i]; if(c.owner!=null&&c.owner!==p.id){ if(Math.hypot(c.x-cap.x,c.y-cap.y)<DEFEND_RADIUS){ danger=true; break; } } } if(danger){ const s=worldToScreen(cap.x,cap.y),blink=0.5+0.5*Math.sin(now*0.015); ctx.save(); ctx.translate(s.x,s.y-(HEX*cam.scale+18*cam.scale)); ctx.scale(cam.scale,cam.scale); ctx.beginPath(); ctx.moveTo(0,-8); ctx.lineTo(7,8); ctx.lineTo(-7,8); ctx.closePath(); ctx.fillStyle='rgba(255,80,80,'+blink+')'; ctx.fill(); ctx.restore(); } }
+  const nnow=performance.now();
+  for(const p of players){ if(!p||p.capital==null||!p.alive) continue; const cap=grid[p.capital]; if(!cap) continue; let danger=false; for(let i=0;i<grid.length;i++){ const c=grid[i]; if(c.owner!=null&&c.owner!==p.id){ if(Math.hypot(c.x-cap.x,c.y-cap.y)<DEFEND_RADIUS){ danger=true; break; } } } if(danger){ const s=worldToScreen(cap.x,cap.y),blink=0.5+0.5*Math.sin(nnow*0.015); ctx.save(); ctx.translate(s.x,s.y-(HEX*cam.scale+18*cam.scale)); ctx.scale(cam.scale,cam.scale); ctx.beginPath(); ctx.moveTo(0,-8); ctx.lineTo(7,8); ctx.lineTo(-7,8); ctx.closePath(); ctx.fillStyle='rgba(255,80,80,'+blink+')'; ctx.fill(); ctx.restore(); } }
   needRender=false;
 }
 
 function updateLegend(){ if(!legendEl) return; legendEl.innerHTML=''; for(const p of players){ const d=document.createElement('div'); d.className='legend-item'; d.innerHTML=`<div style="width:14px;height:10px;background:${p.color};border-radius:4px"></div><div style="font-size:13px">${p.name}</div>`; legendEl.appendChild(d); } }
 function checkVictory(){ if(!gameStarted) return; const alive=players.filter(p=>p&&p.alive); if(alive.length<=1){ const winner=alive[0]||players[0]; if(prodTimer) clearInterval(prodTimer); if(botTimer) clearInterval(botTimer); if(coinTimer) clearInterval(coinTimer); stopWallCheckInterval(); gameStarted=false; victoryText.textContent='الفائز هو:'; victorName.textContent=winner.name; victoryOverlay.style.display='flex'; lbPanel.style.display='none'; lbBtn.style.display='none'; coinDisplay.style.display='none'; hideBuildPanel(); hideLaunchButton(); legendEl.style.display='none'; playVictorySound(); } }
-function returnToLobby(){ if(prodTimer) clearInterval(prodTimer); if(botTimer) clearInterval(botTimer); if(coinTimer) clearInterval(coinTimer); stopWallCheckInterval(); gameStarted=false; playerCoins=0; playerCellCount=0; wallLevel=0; victoryOverlay.style.display='none'; lbPanel.style.display='none'; lbBtn.style.display='none'; coinDisplay.style.display='none'; hideBuildPanel(); hideLaunchButton(); missiles=[]; cellFires=[]; interceptorMissiles=[]; botCoins={}; interceptHits={}; missileNeeds={}; legendEl.style.display='none'; document.getElementById('lobby').style.display='flex'; buildGrid(); setupPlayers(parseInt(playerCount.value,10)||4); seedCapitals(); render(); }
+function returnToLobby(){ if(prodTimer) clearInterval(prodTimer); if(botTimer) clearInterval(botTimer); if(coinTimer) clearInterval(coinTimer); stopWallCheckInterval(); gameStarted=false; playerCoins=0; playerCellCount=0; wallLevel=0; patriotCooldowns={}; victoryOverlay.style.display='none'; lbPanel.style.display='none'; lbBtn.style.display='none'; coinDisplay.style.display='none'; hideBuildPanel(); hideLaunchButton(); missiles=[]; cellFires=[]; interceptorMissiles=[]; botCoins={}; interceptHits={}; missileNeeds={}; legendEl.style.display='none'; document.getElementById('lobby').style.display='flex'; buildGrid(); setupPlayers(parseInt(playerCount.value,10)||4); seedCapitals(); render(); }
 mainMenuBtn.addEventListener('click',returnToLobby); victoryToLobby.addEventListener('click',returnToLobby);
 ratioSlider.addEventListener('input',e=>ratioValue.textContent=e.target.value+'%');
 gameCanvas.addEventListener('pointerdown',e=>{ dragging=true; lastX=e.clientX; lastY=e.clientY; gameCanvas.setPointerCapture&&gameCanvas.setPointerCapture(e.pointerId); });
@@ -499,7 +451,7 @@ gameCanvas.addEventListener('touchmove',e=>{ if(e.touches.length===2){ e.prevent
 gameCanvas.addEventListener('touchend',()=>{ lpd=0; });
 gameCanvas.addEventListener('click',e=>{ const pos=screenToWorld(e.clientX,e.clientY),idx=cellAt(pos.x,pos.y); if(idx==null){ if(!launchMode){ selected=null; hideBuildPanel(); hideLaunchButton(); needRender=true; } return; } const cell=grid[idx]; if(launchMode){ if(cell.owner!==null&&cell.owner!==0&&missileLauncherCell!==null){ launchMissile(missileLauncherCell,idx); } return; } if(selected===null){ if(cell.owner===0){ selected=idx; showBuildPanel(idx); if(cell.missileLauncher){ missileLauncherCell=idx; showLaunchButton(); } } else { selected=null; hideBuildPanel(); hideLaunchButton(); } } else { if(idx===selected){ selected=null; hideBuildPanel(); hideLaunchButton(); } else if(isNeighbor(selected,idx)){ moveTroops(selected,idx,ratioSlider?parseInt(ratioSlider.value,10)/100:0.5); selected=null; hideBuildPanel(); hideLaunchButton(); } else { selected=null; hideBuildPanel(); hideLaunchButton(); } } needRender=true; });
 
-function startGame(){ try{ if(!grid||grid.length<8) buildGrid(); const cnt=Math.max(2,Math.min(4,parseInt(playerCount.value,10)||4)); setupPlayers(cnt); seedCapitals(); startProduction(parseInt(prodRate.value,10)||900); if(botTimer) clearInterval(botTimer); botTickCounter=0; botTimer=setInterval(botTick,900); playerCoins=0; playerCellCount=0; wallLevel=0; botCoins={}; lastBotMissileTime=0; botMissileInterval=5000+Math.floor(Math.random()*10000); if(coinTimer) clearInterval(coinTimer); coinTimer=setInterval(addCoins,1000); startWallCheckInterval(); startMusic(); document.getElementById('lobby').style.display='none'; lbPanel.style.display='none'; lbBtn.style.display='block'; coinDisplay.style.display='flex'; legendEl.style.display='flex'; hideBuildPanel(); hideLaunchButton(); missiles=[]; cellFires=[]; interceptorMissiles=[]; interceptHits={}; missileNeeds={}; updatePatriotCoverage(); launchMode=false; missileLauncherCell=null; selected=null; gameStarted=true; cam.targetScale=cam.scale; updateLegend(); focusOnPlayerCapital(); updateCoinDisplay(); needRender=true; }catch(err){ console.error(err); } }
+function startGame(){ try{ if(!grid||grid.length<8) buildGrid(); const cnt=Math.max(2,Math.min(4,parseInt(playerCount.value,10)||4)); setupPlayers(cnt); seedCapitals(); startProduction(parseInt(prodRate.value,10)||900); if(botTimer) clearInterval(botTimer); botTickCounter=0; botTimer=setInterval(botTick,900); playerCoins=0; playerCellCount=0; wallLevel=0; botCoins={}; patriotCooldowns={}; lastBotMissileTime=0; botMissileInterval=5000+Math.floor(Math.random()*10000); if(coinTimer) clearInterval(coinTimer); coinTimer=setInterval(addCoins,1000); startWallCheckInterval(); startMusic(); document.getElementById('lobby').style.display='none'; lbPanel.style.display='none'; lbBtn.style.display='block'; coinDisplay.style.display='flex'; legendEl.style.display='flex'; hideBuildPanel(); hideLaunchButton(); missiles=[]; cellFires=[]; interceptorMissiles=[]; interceptHits={}; missileNeeds={}; updatePatriotCoverage(); launchMode=false; missileLauncherCell=null; selected=null; gameStarted=true; cam.targetScale=cam.scale; updateLegend(); focusOnPlayerCapital(); updateCoinDisplay(); needRender=true; }catch(err){ console.error(err); } }
 startBtn.addEventListener('click',startGame); window.startGame=startGame;
 let last=performance.now();
 function frame(now){
